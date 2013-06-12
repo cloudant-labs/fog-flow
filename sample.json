@@ -1,0 +1,117 @@
+{
+    "category": "Bug",
+    "resolved": {
+        "ix": 0,
+        "timestamp": null
+    },
+    "last_edited": {
+        "ix": 71,
+        "by": "Kangone Suh",
+        "timestamp": "2013-06-13T22:59:35"
+    },
+    "sub_cases": [],
+    "cloudant_cluster": null,
+    "project": "Cloudant",
+    "title": "this is a test case",
+    "parent_case": "20262",
+    "area": "APIs / Wilson",
+    "cloudant_org": null,
+    "assigned": {
+        "to": "Kangone Suh",
+        "timestamp": "2013-06-13T22:55:08"
+    },
+    "assignee": "Kangone Suh",
+    "tags": [
+        "fog-flow",
+        "test",
+        "cs"
+    ],
+    "status": "Active",
+    "closed": {
+        "ix": 0,
+        "timestamp": null
+    },
+    "cloudant_user": "thisisatest",
+    "priority": 3,
+    "_id": "fb:20302",
+    "events": [
+        {
+            "name": "Kangone Suh",
+            "timestamp": "2013-06-11T23:05:44",
+            "text": null,
+            "_id": "148934",
+            "changes": null,
+            "email": {},
+            "description": "Opened"
+        },
+        {
+            "name": "Kangone Suh",
+            "timestamp": "2013-06-11T23:05:45",
+            "text": null,
+            "_id": "148935",
+            "changes": null,
+            "email": {},
+            "description": "Assigned"
+        },
+        {
+            "name": "Kangone Suh",
+            "timestamp": "2013-06-12T17:21:31",
+            "text": null,
+            "_id": "149180",
+            "changes": "CloudantUser changed from '' to 'thisisatest'\r\n",
+            "email": {},
+            "description": "Edited"
+        },
+        {
+            "name": "Kangone Suh",
+            "timestamp": "2013-06-12T19:31:11",
+            "text": "this is a test for fog-flow",
+            "_id": "149267",
+            "changes": "Added tags 'fog-flow', 'test', 'cs'.\r\n",
+            "email": {},
+            "description": "Edited"
+        },
+        {
+            "name": "Kangone Suh",
+            "timestamp": "2013-06-13T22:55:08",
+            "text": null,
+            "_id": "149722",
+            "changes": null,
+            "email": {},
+            "description": "Assigned"
+        },
+        {
+            "name": "Kangone Suh",
+            "timestamp": "2013-06-13T22:55:43",
+            "text": null,
+            "_id": "149723",
+            "changes": "Correspondent set to '\"Kangone Suh\" <kangone@cloudant.com>'.\r\n",
+            "email": {},
+            "description": "Edited"
+        },
+        {
+            "name": "Kangone Suh",
+            "timestamp": "2013-06-13T22:56:33",
+            "text": "some more text",
+            "_id": "149724",
+            "changes": null,
+            "email": {},
+            "description": "Edited"
+        },
+        {
+            "name": "Kangone Suh",
+            "timestamp": "2013-06-13T22:59:35",
+            "text": null,
+            "_id": "149726",
+            "changes": "Parent changed from (None) to Case 20262.\r\n",
+            "email": {},
+            "description": "Edited"
+        }
+    ],
+    "related_cases": [],
+    "opened": {
+        "ix": 71,
+        "by": "Kangone Suh",
+        "timestamp": "2013-06-11T23:05:44"
+    }
+}
