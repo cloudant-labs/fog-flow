@@ -22,23 +22,21 @@ def unixTime(timestamp):
 
 
 if __name__=='__main__':
-  
-  rssURL = sys.argv[1]
-  lastRun = int(sys.argv[2])
-
-  updates = parseRSS(rssURL, lastRun)
-  success = []
-  for case in updates:
-  	# create the json
-  	json_doc = {"_id": "20635", "foo": "bar"}
-  	u = uploader.upload(json_doc)
-  	# not sure on syntax below, but the idea is there
-  	if u:
-  		""" should let us get a list of which succeeded 
-  		may be more helpful to have list of failures; 
-  		picking out values that dont appear in both lists
-  		that we can report 
-  		"""
-  		success.append(json_doc['_id'])
-  # success if lengths match  		
-  return len(success) == len(updates)
+	rssURL = sys.argv[1]
+	lastRun = int(sys.argv[2])
+	updates = ["1"]
+	#  updates = parseRSS(rssURL, lastRun)
+	success = []
+	for case in updates:
+		# create the json
+  		json_doc = {"_id": "2062332", "foo": "bar"}
+  		u = uploader.upload(json_doc)
+  		if u:
+	  		""" should let us get a list of which succeeded 
+	  		may be more helpful to have list of failures; 
+	  		picking out values that dont appear in both lists
+	  		that we can report 
+	  		"""
+  			success.append(u)
+  	# success if lengths match
+  	print len(success) == len(updates)
