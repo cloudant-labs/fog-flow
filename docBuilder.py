@@ -15,7 +15,7 @@ def docBuilder(url, _id):
   ENCODE_TYPE = 'UTF-8'
 
 	fb = FogBugz(url)
- 	fb.logon(fbSettings.USER_NAME, fbSettings.PASSWORD)
+ 	fb.logon(fbSettings.EMAIL, fbSettings.PASSWORD)
 
   case = fb.search(q = _id, cols = 'sTitle,dtOpened,dtClosed,ixPersonOpenedBy,ixPersonClosedBy,ixPersonResolvedBy,ixPersonLastEditedBy,ixRelatedBugs,sPersonAssignedTo,ixPriority,CloudantUser,CloudantCluster,CloudantOrg,tags,ixBugParent,ixBugChildren,dtResolved,dtClosed,dtLastUpdated,sProject,sArea,sCategory,events,people')     
 
@@ -131,10 +131,4 @@ d = docBuilder(url, _id)
 
 # ouput json file
 #with open('sample.json', 'w') as outfile:
-# json.dump(d, outfile)
-
-
-print
-for item in d:
-	print str(item)+":"+'\t\t' + str(d[item]) 
-print
+# json.dump(d, outfile) 
