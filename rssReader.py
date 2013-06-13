@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import feedparser, sys, time, calendar
+import feedparser, sys, time, calendar, uploader
 
 def parseRSS(rssURL, lastRun):
 	# create a new parser from RSS feed
@@ -9,7 +9,7 @@ def parseRSS(rssURL, lastRun):
 	for entry in fp.entries:
 		timeStamp = unixTime(entry.published)
 
-		# if more recent than last run, this entry is an update
+		# if more recent than last run, this entry has an update
 		if timeStamp > lastRun:
 			case = entry.title.split(':')[0].lstrip('Case ')
 			updates.append(case)
@@ -27,6 +27,18 @@ if __name__=='__main__':
   lastRun = int(sys.argv[2])
 
   updates = parseRSS(rssURL, lastRun)
+  success = []
   for case in updates:
   	# create the json
-  	# upload the doc to Cloudant
+  	json_doc = {"_id": "20635", "foo": "bar"}
+  	u = uploader.upload(json_doc)
+  	# not sure on syntax below, but the idea is there
+  	if u:
+  		""" should let us get a list of which succeeded 
+  		may be more helpful to have list of failures; 
+  		picking out values that dont appear in both lists
+  		that we can report 
+  		"""
+  		success.append(json_doc['_id'])
+  # success if lengths match  		
+  return len(success) == len(updates)

@@ -19,7 +19,7 @@ def docBuilder(url, _id):
 
 
 	fb = FogBugz(url)
- 	fb.logon(fbSettings.USER_NAME, fbSettings.PASSWORD)
+ 	fb.logon(fbSettings.EMAIL, fbSettings.PASSWORD)
 
 
 
@@ -166,13 +166,13 @@ d = docBuilder(url, _id)
 
 # ouput json file
 #with open('sample.json', 'w') as outfile:
-# json.dump(d, outfile)
+# json.dump(d, outfile) 
 
 
-print
+sPersonAssignedTo
 for item in d:
-	print str(item)+":"+'\t\t' + str(d[item]) 
-print
+	sPersonAssignedTo str(item)+":"+'\t\t' + str(d[item]) 
+sPersonAssignedTo
 
 
 
