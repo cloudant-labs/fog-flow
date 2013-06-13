@@ -16,7 +16,7 @@ def parseRSS(rssURL, lastRun):
 	return updates
 
 
-# convert fogbugz rss pubdate (RFC 822) into Unix time
+# convert fogbugz rss pubdate into Unix time
 def unixTime(timestamp):
 	return calendar.timegm(time.strptime(timestamp, "%a, %d %b %Y %H:%M:%S %Z"))
 
