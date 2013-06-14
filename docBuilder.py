@@ -19,11 +19,11 @@ def docBuilder(url, _id):
 
 
 	fb = FogBugz(url)
- 	fb.logon(fbSettings.EMAIL, fbSettings.PASSWORD)
+ 	fb.logon(fbSettings.USER_NAME, fbSettings.PASSWORD)
 
 
 
-	case = fb.search(q = _id, cols = 'sTitle,dtOpened,dtClosed,ixPersonOpenedBy,ixPersonClosedBy,ixPersonResolvedBy,ixPersonLastEditedBy,ixRelatedBugs,sPersonAssignedTo,ixPriority,CloudantUser,CloudantCluster,CloudantOrg,tags,ixBugParent,ixBugChildren,dtResolved,dtClosed,dtLastUpdated,sProject,sArea,sCategory,events,people')     
+	case = fb.search(q = _id, cols = 'sTitle,dtOpened,dtClosed,ixPersonOpenedBy,ixPersonClosedBy,ixPersonResolvedBy,ixPersonLastEditedBy,ixRelatedBugs,sPersonAssignedTo,sStatus,ixPriority,CloudantUser,CloudantCluster,CloudantOrg,tags,ixBugParent,ixBugChildren,dtResolved,dtClosed,dtLastUpdated,sProject,sArea,sCategory,events,people')
 
     
 
@@ -36,22 +36,23 @@ def docBuilder(url, _id):
 
     # store sub cases into list
   	sub_cases = []
- 	for i in case.ixbugchildren:
-   		sub_cases.append(i)
+  	if case.ixbugchildren.string:
+ 		for i in case.ixbugchildren.string.encode(ENCODE_TYPE).split(","):
+   			sub_cases.append(i)
 
 
    	# store related cases into list
  	related_cases = []
  	if case.ixrelatedbugs.string:
  		for i in case.ixrelatedbugs.string.encode(ENCODE_TYPE).split(","):
-   			related_cases.append(int(i))
+   			related_cases.append(i)
     
 
 	
 
 
     # document 
-	doc = { '_id' : _id,
+	doc = { '_id' : 'fb:' + str(_id),
     		'title' : case.stitle.string.encode(ENCODE_TYPE),
         	'cloudant_user' : case.cloudantuser.string.encode(ENCODE_TYPE) if case.cloudantuser.string else None,
         	'cloudant_cluster' : case.cloudantcluster.string.encode(ENCODE_TYPE) if case.cloudantcluster.string else None,
@@ -77,9 +78,10 @@ def docBuilder(url, _id):
 
        		'priority' : int(case.ixpriority.string.encode(ENCODE_TYPE)),
        		'tags' : tags,
-     		'parent_case' : int(case.ixbugparent.string.encode(ENCODE_TYPE)),
+     		'parent_case' : case.ixbugparent.string.encode(ENCODE_TYPE),
       		'sub_cases' : sub_cases,
       		'project' : case.sproject.string.encode(ENCODE_TYPE),
+      		'status' : case.sstatus.string.encode(ENCODE_TYPE),
             
        		'events' : []	
 
@@ -114,7 +116,7 @@ def docBuilder(url, _id):
 
 		# adding event history to 'events' field
 		event = {}
- 		event['_id'] = int(i['ixbugevent'])
+ 		event['_id'] = i['ixbugevent'].encode(ENCODE_TYPE)
  		event['name'] = i.sperson.string.encode(ENCODE_TYPE)
  		event['timestamp'] = time_format(i.dt.string.encode(ENCODE_TYPE))
  		event['description'] = i.sverb.string.encode(ENCODE_TYPE)
@@ -137,9 +139,6 @@ def docBuilder(url, _id):
 
 
   		doc['events'].append(event)
-
-
-
 	
 
 
@@ -156,23 +155,19 @@ def docBuilder(url, _id):
 
 ########################## TEST ##########################
 
-
-
 url = 'https://cloudant.fogbugz.com/'
-_id = 20302
+_id = 17792#20302
+>>>>>>> eeb59ec8fa5d6fa0f763d5e1e2aa3d8977b1f47f
 
 
 d = docBuilder(url, _id)
 
 # ouput json file
 #with open('sample.json', 'w') as outfile:
-# json.dump(d, outfile) 
+# json.dump(d, outfile)
 
 
-sPersonAssignedTo
+print
 for item in d:
-	sPersonAssignedTo str(item)+":"+'\t\t' + str(d[item]) 
-sPersonAssignedTo
-
-
-
+	print str(item)+":"+'\t\t' + str(d[item]) 
+print
