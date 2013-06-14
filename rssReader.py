@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 import feedparser, sys, time, calendar, uploader
 
-def parse_rss(rss_url, last_run):
 # parse the global rss feed for the filter, creating a list of docs to create/update
+def parse_rss(rss_url, last_run):
 	# create a new parser from RSS feed
 	fp = feedparser.parse(rss_url)
 	# create list of cases needing update 
@@ -19,7 +19,6 @@ def parse_rss(rss_url, last_run):
 
 # convert fogbugz rss date into Unix timestamp
 def unixTime(timestamp):
->>>>>>> 20337-uploader
 	return calendar.timegm(time.strptime(timestamp, "%a, %d %b %Y %H:%M:%S %Z"))
 
 
