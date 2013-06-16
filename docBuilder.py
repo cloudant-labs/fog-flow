@@ -1,5 +1,4 @@
 
-
 import json, time, xmltodict, fbSettings
 from datetime import datetime
 from fogbugz import FogBugz
@@ -70,6 +69,7 @@ def get_tags(case):     # returns a list of existing tags in a case
 
 
 def docBuilder(url, _id):       # building the actual document
+                                # _id must be in 'fb:#####' format
     fb = FogBugz(url)
     fb.logon(fbSettings.USER_NAME, fbSettings.PASSWORD)
 
