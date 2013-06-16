@@ -1,4 +1,3 @@
-
 import json, time, xmltodict, fbSettings
 from datetime import datetime
 from fogbugz import FogBugz
@@ -94,7 +93,6 @@ def docBuilder(url, _id):       # building the actual document
             'status' : toString(case.sstatus),
             'events' : get_events(case),
 
-            ##### name/timestamp strings retrieved from loop below #####
             'opened' : {'ix' : int(toString(case.ixpersonopenedby)), 'by' : get_person(case,'1'),
                         'timestamp' : time_format(toString(case.dtopened))},
             'closed' : {'ix' : int(toString(case.ixpersonclosedby)), 'by' : get_person(case,'6'),
