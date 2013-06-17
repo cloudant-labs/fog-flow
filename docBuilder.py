@@ -1,30 +1,36 @@
-
-
-import json, time, fbSettings, requests
->>>>>>> b26bb04b7e81e10cb9a48e428cc580cb2e43f680
-from datetime import datetime
+import json, time, fbSettings, requests, calendar, xmltodict
 from fogbugz import FogBugz
 
+# iso format found in fb
+TIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
-
-def time_format(timestamp):     # format timestamp into datetime object
+# convert fogbugz time format into Unix timestamp
+def unix_time(timestamp):
     if timestamp:
-        return datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%SZ").isoformat()
+        return calendar.timegm(time.strptime(timestamp, TIME_FORMAT))
     else:
         return None
 
-
-
-def toString(field):            # convert tag to string         
-    if field.string:            # validate input field 
+# convert tag to string
+def toString(field): 
+    if field.string:
         return field.string.encode('UTF-8')
     else:
         return None
 
 
+# returns the _rev of a given doc (if it exists)
+def get_rev(_id):
+    r = requests.head(fbSettings.DB_URL + _id, auth=(fbSettings.DB_USER, fbSettings.DB_PASS))
+    if r.status_code < 300:
+        return r.headers['etag'].strip('"')
+    else:
+        return None
 
-def get_email(evt):         # returns dict of email fields from an event
-    if toString(evt.femail) == 'true':  # ONLY if email exists
+
+# returns dict of email fields from an event
+def get_email(evt):         
+    if toString(evt.femail):  # ONLY if email exists
         email = {}
         email['from'] = toString(evt.sfrom)
         email['to'] = toString(evt.sto)
@@ -37,22 +43,14 @@ def get_email(evt):         # returns dict of email fields from an event
         return None
 
 
-
-def get_events(case):       # returns list of all events in a case.
-    events = []
-    for i in case.events.findAll('event'):
-        event = {}
-        event['_id'] = i['ixbugevent'].encode('UTF-8')
-        event['name'] = toString(i.sperson)
-        event['timestamp'] = time_format(toString(i.dt))
-        event['description'] = toString(i.sverb)
-        event['changes'] = toString(i.schanges)
-        event['text'] = toString(i.s)
-        event['email'] = get_email(i)
-        events.append(event)
-
-    return events
-
+# and other essential info
+def get_events(_id, fb):
+  # request for events on given case
+  respBugEvents = fb.search(q=_id, cols='events')
+  events = xmltodict.parse(str(respBugEvents))
+  events = events['response']['cases']['case']
+  events = events['events']['event']
+  return events
 
 
 def get_person(case, ixevent):              # get the person's name from the latest occurance 
@@ -61,27 +59,23 @@ def get_person(case, ixevent):              # get the person's name from the lat
             return toString(i.sperson)
 
 
-def get_tags(case):     # returns a list of existing tags in a case
-    li=[]
+# returns a list of existing tags in a case
+def get_tags(case):
+    li = []
     for tag in case.tags:
         li.append(toString(tag))
     return li
 
-
-
-
-def docBuilder(url, _id):       # building the actual document
-                                # _id must be in 'gb:####' format
+# building the actual document
+def build(url, _id):
+    # _id must be in 'gb:####' format
     fb = FogBugz(url)
-    fb.logon(fbSettings.USR_NAME, fbSettings.PASS)
+    fb.logon(fbSettings.API_USER, fbSettings.API_PASS)
 
     case = fb.search(q = str(_id).strip("fb:"), cols = 'sTitle,dtOpened,dtClosed,ixPersonOpenedBy,ixPersonClosedBy,ixPersonResolvedBy,ixPersonLastEditedBy,ixRelatedBugs,sPersonAssignedTo,sStatus,ixPriority,CloudantUser,CloudantCluster,CloudantOrg,tags,ixBugParent,ixBugChildren,dtResolved,dtClosed,dtLastUpdated,sProject,sArea,sCategory,events')
     
-    
-
     # document (dict in JSON format) 
     doc = { '_id' : _id,
-            '_rev' : (requests.get('db_url'+_id, auth=('[user]','[pass]'))).headers["etag"].strip('"'),
             'title' : toString(case.stitle),
             'cloudant_user' : toString(case.cloudantuser),
             'cloudant_cluster' : toString(case.cloudantcluster),            
@@ -97,26 +91,21 @@ def docBuilder(url, _id):       # building the actual document
             'parent_case' : toString(case.ixbugparent),
             'project' : toString(case.sproject),
             'status' : toString(case.sstatus),
-            'events' : get_events(case),
-
+            'events' : get_events(_id, fb),
             'opened' : {'ix' : int(toString(case.ixpersonopenedby)), 'by' : get_person(case,'1'),
-                        'timestamp' : time_format(toString(case.dtopened))},
+                        'timestamp' : unix_time(toString(case.dtopened))},
             'closed' : {'ix' : int(toString(case.ixpersonclosedby)), 'by' : get_person(case,'6'),
-                        'timestamp' : time_format(toString(case.dtclosed))},
+                        'timestamp' : unix_time(toString(case.dtclosed))},
             'resolved' : {'ix' : int(toString(case.ixpersonresolvedby)), 'by' : get_person(case, '14'),
-                        'timestamp' : time_format(toString(case.dtresolved))},
+                        'timestamp' : unix_time(toString(case.dtresolved))},
             'last_edited' : {'ix' : int(toString(case.ixpersonlasteditedby)),
                         'by' : toString(case.events.findAll('event')[-1].sperson),
-                        'timestamp' : time_format(toString(case.dtlastupdated))}
-
+                        'timestamp' : unix_time(toString(case.dtlastupdated))}
             }
-
-
+    # add _rev if the document is a revision    
+    _rev = get_rev(doc['_id'])
+    if _rev is not None:
+        doc['_rev'] = _rev
 
     fb.logoff() # log off from fogbugz
-
     return doc
-
-
-
-

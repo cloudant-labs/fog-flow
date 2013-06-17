@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import feedparser, sys, time, calendar, uploader, docTest, fbSettings
+import feedparser, sys, time, calendar, uploader, docBuilder, fbSettings
 
 # parse the global rss feed for the filter, creating a list of docs to create/update
 def parse_rss(rss_url, last_run):
@@ -30,7 +30,7 @@ if __name__=='__main__':
 	for case_id in updates:
 		# create the json
 		# call to docBuilder function here
-		json_doc = docTest.build(fbSettings.API_URL, case_id)
+		json_doc = docBuilder.build(fbSettings.API_URL, case_id)
 		print "uploading " + str(case_id)
   		u = uploader.upload(json_doc)
   		print u
