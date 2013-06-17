@@ -1,4 +1,7 @@
-import json, time, xmltodict, fbSettings
+
+
+import json, time, fbSettings, requests
+>>>>>>> b26bb04b7e81e10cb9a48e428cc580cb2e43f680
 from datetime import datetime
 from fogbugz import FogBugz
 
@@ -68,14 +71,17 @@ def get_tags(case):     # returns a list of existing tags in a case
 
 
 def docBuilder(url, _id):       # building the actual document
-                                # _id must be in 'fb:#####' format
+                                # _id must be in 'gb:####' format
     fb = FogBugz(url)
-    fb.logon(fbSettings.USER_NAME, fbSettings.PASSWORD)
+    fb.logon(fbSettings.USR_NAME, fbSettings.PASS)
 
     case = fb.search(q = str(_id).strip("fb:"), cols = 'sTitle,dtOpened,dtClosed,ixPersonOpenedBy,ixPersonClosedBy,ixPersonResolvedBy,ixPersonLastEditedBy,ixRelatedBugs,sPersonAssignedTo,sStatus,ixPriority,CloudantUser,CloudantCluster,CloudantOrg,tags,ixBugParent,ixBugChildren,dtResolved,dtClosed,dtLastUpdated,sProject,sArea,sCategory,events')
+    
+    
 
     # document (dict in JSON format) 
     doc = { '_id' : _id,
+            '_rev' : (requests.get('db_url'+_id, auth=('[user]','[pass]'))).headers["etag"].strip('"'),
             'title' : toString(case.stitle),
             'cloudant_user' : toString(case.cloudantuser),
             'cloudant_cluster' : toString(case.cloudantcluster),            
@@ -110,6 +116,7 @@ def docBuilder(url, _id):       # building the actual document
     fb.logoff() # log off from fogbugz
 
     return doc
+
 
 
 
