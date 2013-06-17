@@ -1,173 +1,115 @@
-import json
+import json, time, xmltodict, fbSettings
 from datetime import datetime
-import time
 from fogbugz import FogBugz
-import fbSettings
-
-
-def time_format(from_time):
-    dt = datetime.strptime(from_time, "%Y-%m-%dT%H:%M:%SZ")
-    return dt.isoformat()
 
 
 
-
-def docBuilder(url, _id):
-  	
-  	ENCODE_TYPE = 'UTF-8'
-
-
-
-	fb = FogBugz(url)
- 	fb.logon(fbSettings.USER_NAME, fbSettings.PASSWORD)
+def time_format(timestamp):     # format timestamp into datetime object
+    if timestamp:
+        return datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%SZ").isoformat()
+    else:
+        return None
 
 
 
-	case = fb.search(q = _id, cols = 'sTitle,dtOpened,dtClosed,ixPersonOpenedBy,ixPersonClosedBy,ixPersonResolvedBy,ixPersonLastEditedBy,ixRelatedBugs,sPersonAssignedTo,sStatus,ixPriority,CloudantUser,CloudantCluster,CloudantOrg,tags,ixBugParent,ixBugChildren,dtResolved,dtClosed,dtLastUpdated,sProject,sArea,sCategory,events,people')
-
-    
-
-
-    # store tags into list
-	tags = []
- 	for i in case.tags:
-   		tags.append(i.string.encode(ENCODE_TYPE))
+def toString(field):            # convert tag to string         
+    if field.string:            # validate input field 
+        return field.string.encode('UTF-8')
+    else:
+        return None
 
 
-    # store sub cases into list
-  	sub_cases = []
-  	if case.ixbugchildren.string:
- 		for i in case.ixbugchildren.string.encode(ENCODE_TYPE).split(","):
-   			sub_cases.append(i)
+
+def get_email(evt):         # returns dict of email fields from an event
+    if toString(evt.femail) == 'true':  # ONLY if email exists
+        email = {}
+        email['from'] = toString(evt.sfrom)
+        email['to'] = toString(evt.sto)
+        email['subject'] = toString(evt.ssubject)
+        email['body'] = toString(evt.sbodytext)
+        email['cc'] = toString(evt.scc)
+        email['timestamp'] = toString(evt.sdate)
+        return email
+    else:
+        return None
 
 
-   	# store related cases into list
- 	related_cases = []
- 	if case.ixrelatedbugs.string:
- 		for i in case.ixrelatedbugs.string.encode(ENCODE_TYPE).split(","):
-   			related_cases.append(i)
-    
 
-	
+def get_events(case):       # returns list of all events in a case.
+    events = []
+    for i in case.events.findAll('event'):
+        event = {}
+        event['_id'] = i['ixbugevent'].encode('UTF-8')
+        event['name'] = toString(i.sperson)
+        event['timestamp'] = time_format(toString(i.dt))
+        event['description'] = toString(i.sverb)
+        event['changes'] = toString(i.schanges)
+        event['text'] = toString(i.s)
+        event['email'] = get_email(i)
+        events.append(event)
+
+    return events
 
 
-    # document 
-	doc = { '_id' : 'fb:' + str(_id),
-    		'title' : case.stitle.string.encode(ENCODE_TYPE),
-        	'cloudant_user' : case.cloudantuser.string.encode(ENCODE_TYPE) if case.cloudantuser.string else None,
-        	'cloudant_cluster' : case.cloudantcluster.string.encode(ENCODE_TYPE) if case.cloudantcluster.string else None,
-        	'cloudant_org' : case.cloudantorg.string.encode(ENCODE_TYPE) if case.cloudantorg.string else None,
-        	'area' : case.sarea.string.encode(ENCODE_TYPE),
-       		'category' : case.scategory.string.encode(ENCODE_TYPE),
-       		'related_cases' : related_cases,
 
-            ##### name/timestamp strings retrieved from loop below #####
-       		'opened' : {'ix' : int(case.ixpersonopenedby.string.encode(ENCODE_TYPE)),
-                   		'timestamp' : time_format(case.dtopened.string.encode(ENCODE_TYPE))},
-      		'closed' : {'ix' : int(case.ixpersonclosedby.string.encode(ENCODE_TYPE)),
-                   		'timestamp' : time_format(case.dtclosed.string.encode(ENCODE_TYPE)) if case.dtclosed.string else None},
-       		'resolved' : {'ix' : int(case.ixpersonresolvedby.string.encode(ENCODE_TYPE)),
-                    	'timestamp' : time_format(case.dtresolved.string.encode(ENCODE_TYPE)) if case.dtresolved.string else None},
+def get_person(case, ixevent):              # get the person's name from the latest occurance 
+    for i in case.events.findAll('event'):  # of a particular type of event with the evt code
+        if toString(i.evt) == ixevent:
+            return toString(i.sperson)
 
-      		'last_edited' : {'ix' : int(case.ixpersonlasteditedby.string.encode(ENCODE_TYPE)),
-                     	'timestamp' : time_format(case.dtlastupdated.string.encode(ENCODE_TYPE)) if case.dtlastupdated.string else None},       
-            
 
-       		'assignee' : case.spersonassignedto.string.encode(ENCODE_TYPE),
-      		'assigned' : {"to" : case.spersonassignedto.string.encode(ENCODE_TYPE)},
-
-       		'priority' : int(case.ixpriority.string.encode(ENCODE_TYPE)),
-       		'tags' : tags,
-     		'parent_case' : case.ixbugparent.string.encode(ENCODE_TYPE),
-      		'sub_cases' : sub_cases,
-      		'project' : case.sproject.string.encode(ENCODE_TYPE),
-      		'status' : case.sstatus.string.encode(ENCODE_TYPE),
-            
-       		'events' : []	
-
-       		}
+def get_tags(case):     # returns a list of existing tags in a case
+    li=[]
+    for tag in case.tags:
+        li.append(toString(tag))
+    return li
 
 
 
 
-	
-	event_array = case.events.findAll('event')
+def docBuilder(url, _id):       # building the actual document
+                                # _id must be in 'fb:#####' format
+    fb = FogBugz(url)
+    fb.logon(fbSettings.USER_NAME, fbSettings.PASSWORD)
 
-	for i in event_array:
+    case = fb.search(q = str(_id).strip("fb:"), cols = 'sTitle,dtOpened,dtClosed,ixPersonOpenedBy,ixPersonClosedBy,ixPersonResolvedBy,ixPersonLastEditedBy,ixRelatedBugs,sPersonAssignedTo,sStatus,ixPriority,CloudantUser,CloudantCluster,CloudantOrg,tags,ixBugParent,ixBugChildren,dtResolved,dtClosed,dtLastUpdated,sProject,sArea,sCategory,events')
 
-		# retrieve names, timestamps for 'opened','closed','assigned',etc for top level fields
-		ixevent = int(i.evt.string.encode(ENCODE_TYPE))
+    # document (dict in JSON format) 
+    doc = { '_id' : _id,
+            'title' : toString(case.stitle),
+            'cloudant_user' : toString(case.cloudantuser),
+            'cloudant_cluster' : toString(case.cloudantcluster),            
+            'cloudant_org' : toString(case.cloudantorg),
+            'area' : toString(case.sarea),
+            'category' : toString(case.scategory),
+            'assignee' : toString(case.spersonassignedto),
+            'assigned' : {'to' : toString(case.spersonassignedto)},
+            'priority' : int(toString(case.ixpriority)),
+            'tags' : get_tags(case),
+            'sub_cases' : toString(case.ixbugchildren).split(",") if toString(case.ixbugchildren) else None,
+            'related_cases' : toString(case.ixrelatedbugs).split(",") if toString(case.ixrelatedbugs) else None,
+            'parent_case' : toString(case.ixbugparent),
+            'project' : toString(case.sproject),
+            'status' : toString(case.sstatus),
+            'events' : get_events(case),
 
-		if ixevent == 1:		# opened evt
-			doc['opened']['by'] = i.sperson.string.encode(ENCODE_TYPE)
-		if ixevent == 6:		# closed evt
-			doc['closed']['by'] = i.sperson.string.encode(ENCODE_TYPE)
-		if ixevent == 14:		# resolved evt
-			doc['resolved']['by'] = i.sperson.string.encode(ENCODE_TYPE)
-		if ixevent == 3:		# assigned evt
-			doc['assigned']['timestamp'] = time_format(i.dt.string.encode(ENCODE_TYPE))
+            'opened' : {'ix' : int(toString(case.ixpersonopenedby)), 'by' : get_person(case,'1'),
+                        'timestamp' : time_format(toString(case.dtopened))},
+            'closed' : {'ix' : int(toString(case.ixpersonclosedby)), 'by' : get_person(case,'6'),
+                        'timestamp' : time_format(toString(case.dtclosed))},
+            'resolved' : {'ix' : int(toString(case.ixpersonresolvedby)), 'by' : get_person(case, '14'),
+                        'timestamp' : time_format(toString(case.dtresolved))},
+            'last_edited' : {'ix' : int(toString(case.ixpersonlasteditedby)),
+                        'by' : toString(case.events.findAll('event')[-1].sperson),
+                        'timestamp' : time_format(toString(case.dtlastupdated))}
 
-		# get the person of the last edited event
-		if i == event_array[-1]:
-			doc['last_edited']['by'] = i.sperson.string.encode(ENCODE_TYPE)
-
-
-
-
-		# adding event history to 'events' field
-		event = {}
- 		event['_id'] = i['ixbugevent'].encode(ENCODE_TYPE)
- 		event['name'] = i.sperson.string.encode(ENCODE_TYPE)
- 		event['timestamp'] = time_format(i.dt.string.encode(ENCODE_TYPE))
- 		event['description'] = i.sverb.string.encode(ENCODE_TYPE)
- 		event['changes'] = i.schanges.string.encode(ENCODE_TYPE) if i.schanges.string else None
- 		event['text'] = i.s.string.encode(ENCODE_TYPE) if i.s.string else None
-  		event['email'] = {}
-
-    	# only if email exists
- 		if (i.femail.string.encode(ENCODE_TYPE) == 'true'):
-  			event['email']['from'] = i.sfrom.string.encode(ENCODE_TYPE)
-  			event['email']['to'] = i.sto.string.encode(ENCODE_TYPE)
-  			event['email']['subject'] = i.ssubject.string.encode(ENCODE_TYPE) if i.ssubject.string else None
-  			event['email']['body'] = i.sbodytext.string.encode(ENCODE_TYPE) if i.sbodytext.string else None
-  			event['email']['cc'] = i.scc.string.encode(ENCODE_TYPE) if i.scc.string else None
-
-    		# time shows exactly as it appears from the message. may be different for every message
-  			event['email']['timestamp'] = (i.sdate.string.encode(ENCODE_TYPE))
+            }
 
 
 
+    fb.logoff() # log off from fogbugz
 
-  		doc['events'].append(event)
-	
-
-
-
-	fb.logoff()
+    return doc
 
 
 
-	return doc
-
-
-
-
-
-########################## TEST ##########################
-
-url = 'https://cloudant.fogbugz.com/'
-_id = 17792#20302
->>>>>>> eeb59ec8fa5d6fa0f763d5e1e2aa3d8977b1f47f
-
-
-d = docBuilder(url, _id)
-
-# ouput json file
-#with open('sample.json', 'w') as outfile:
-# json.dump(d, outfile)
-
-
-print
-for item in d:
-	print str(item)+":"+'\t\t' + str(d[item]) 
-print
