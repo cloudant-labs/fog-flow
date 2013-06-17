@@ -8,7 +8,7 @@
         "by": "John Harrison",
         "timestamp": 1371243113
     },
-    "cloudant_cluster: null,
+    "cloudant_cluster": null,
     "project": "Customer Success",
     "title": "Collect data",
     "parent_case": "19988",
