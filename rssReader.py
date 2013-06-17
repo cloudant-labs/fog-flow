@@ -8,7 +8,7 @@ def parse_rss(rss_url, last_run):
 	# create list of cases needing update 
 	updates = []
 	for entry in fp.entries:
-		timestamp = unixTime(entry.published)
+		timestamp = unixTime(entry.published, "%a, %d %b %Y %H:%M:%S %Z")
 
 		# if more recent than last run, this entry has an update
 		if timeStamp > last_run:
@@ -18,8 +18,8 @@ def parse_rss(rss_url, last_run):
 
 
 # convert fogbugz rss date into Unix timestamp
-def unixTime(timestamp):
-	return calendar.timegm(time.strptime(timestamp, "%a, %d %b %Y %H:%M:%S %Z"))
+def unixTime(timestamp, format):
+	return calendar.timegm(time.strptime(timestamp, format))
 
 
 if __name__=='__main__':
