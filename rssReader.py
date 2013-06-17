@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import feedparser, sys, time, calendar, uploader
+import feedparser, sys, time, calendar, uploader, docTest, fbSettings
 
 # parse the global rss feed for the filter, creating a list of docs to create/update
 def parse_rss(rss_url, last_run):
@@ -11,7 +11,7 @@ def parse_rss(rss_url, last_run):
 		timestamp = unixTime(entry.published, "%a, %d %b %Y %H:%M:%S %Z")
 
 		# if more recent than last run, this entry has an update
-		if timeStamp > last_run:
+		if timestamp > last_run:
 			case = entry.title.split(':')[0].lstrip('Case ')
 			updates.append(case)
 	return updates
@@ -23,15 +23,17 @@ def unixTime(timestamp, format):
 
 
 if __name__=='__main__':
-	rss_URL = sys.argv[1]
+	rss_url = sys.argv[1]
 	last_run = int(sys.argv[2])
-	updates = ["1"]
-	#  updates = parseRSS(rssURL, lastRun)
+	updates = parse_rss(rss_url, last_run)
 	success = []
-	for case in updates:
+	for case_id in updates:
 		# create the json
 		# call to docBuilder function here
+		json_doc = docTest.build(fbSettings.API_URL, case_id)
+		print "uploading " + str(case_id)
   		u = uploader.upload(json_doc)
+  		print u
   		if u:
   			success.append(u)
   	# success if lengths match (as many successes as docs)
