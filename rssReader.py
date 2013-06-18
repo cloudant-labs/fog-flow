@@ -1,7 +1,7 @@
 #!/usr/local/bin/python
-
 import calendar
 import json
+import sys
 import time
 
 import feedparser 
@@ -60,17 +60,9 @@ def unixTime(timestamp, format):
 if __name__=='__main__':
     rss_url = fbSettings.RSS_URL
     last_run = get_last_run()
-    update_last_run()
-    updates = parse_rss(rss_url, last_run)
-    success = []
-    for case_id in updates:
-        # create the json
-        # call to docBuilder function here
+    for case_id in parse_rss(rss_url, last_run):
         json_doc = docBuilder.build(fbSettings.API_URL, case_id)
         print "uploading " + str(case_id)
-        u = uploader.upload(json_doc)
-        print u
-        if u:
-            success.append(u)
-    # success if lengths match (as many successes as docs)
-    print len(success) == len(updates)
+        if not uploader.upload(json_doc):
+            sys.exit(1)
+    update_last_run()
