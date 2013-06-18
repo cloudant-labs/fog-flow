@@ -45,10 +45,10 @@ def get_last_run():
 
 
 # updates the timestamp by overwriting/creating the temp state file
-def update_last_run():
+def update_last_run(current_run):
     f = open('/tmp/fog-flow-state.json', 'w')
     data = {}
-    data['last_run'] = calendar.timegm(time.gmtime())
+    data['last_run'] = current_run
     f.write(json.dumps(data))
 
 
@@ -58,6 +58,7 @@ def unixTime(timestamp, format):
 
 
 if __name__=='__main__':
+    current_run = calendar.timegm(time.gmtime())
     rss_url = fbSettings.RSS_URL
     last_run = get_last_run()
     for case_id in parse_rss(rss_url, last_run):
@@ -65,4 +66,4 @@ if __name__=='__main__':
         print "uploading " + str(case_id)
         if not uploader.upload(json_doc):
             sys.exit(1)
-    update_last_run()
+    update_last_run(current_run)
