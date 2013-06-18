@@ -1,5 +1,14 @@
 #!/usr/local/bin/python
-import feedparser, sys, time, calendar, uploader, docBuilder, fbSettings, json
+
+import calendar
+import json
+import time
+
+import feedparser 
+
+import docBuilder
+import fbSettings
+import uploader
 
 # parse the global rss feed for the filter, creating a list of docs to create/update
 def parse_rss(rss_url, last_run):
