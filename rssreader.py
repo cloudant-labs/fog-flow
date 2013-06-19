@@ -1,4 +1,4 @@
-#!/usr/local/bin/python
+#!/usr/bin/env python
 
 import calendar
 import json
@@ -67,7 +67,7 @@ def unix_time(timestamp, format):
     return calendar.timegm(time.strptime(timestamp, format))
 
 
-if __name__=='__main__':
+def main():
     current_run = calendar.timegm(time.gmtime())
     rss_url = fbsettings.RSS_URL
     last_run = get_last_run()
@@ -77,3 +77,7 @@ if __name__=='__main__':
         if not upload(json_doc):
             sys.exit(1)
     update_last_run(current_run)
+
+
+if __name__=='__main__':
+    main()
