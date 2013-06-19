@@ -10,7 +10,6 @@ import requests
 
 import docbuilder
 import fbsettings
-import uploader
 
 # to parse the global rss feed for the filter, creating a list of docs to create/update
 def parse_rss(rss_url, last_run):
