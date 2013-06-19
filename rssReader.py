@@ -1,29 +1,40 @@
 #!/usr/local/bin/python
+
 import calendar
 import json
 import sys
 import time
 
-import feedparser 
+import feedparser
+import requests
 
-import docBuilder
-import fbSettings
+import docbuilder
+import fbsettings
 import uploader
 
-# parse the global rss feed for the filter, creating a list of docs to create/update
+# to parse the global rss feed for the filter, creating a list of docs to create/update
 def parse_rss(rss_url, last_run):
     # create a new parser from RSS feed
     fp = feedparser.parse(rss_url)
-    # create list of cases needing update 
+    # create list of cases needing update
     updates = []
     for entry in fp.entries:
-        timestamp = unixTime(entry.published, "%a, %d %b %Y %H:%M:%S %Z")
+        timestamp = unix_time(entry.published, "%a, %d %b %Y %H:%M:%S %Z")
 
         # if more recent than last run, this entry has an update
         if timestamp > last_run:
             case = entry.title.split(':')[0].lstrip('Case ')
             updates.append(case)
     return updates
+
+# upload an individual json document
+def upload(json_doc):
+    headers = {"content-type": "application/json"}
+    resp = requests.post(fbsettings.DB_URL, auth=(fbsettings.DB_USER, fbsettings.DB_PASS), data=json.dumps(json_doc), headers=headers)
+    # will return true if this upload was successful
+    print resp
+    return resp.status_code in [201, 202]
+
 
 
 # reads a Unix timestamp from a temp file representing the last time
@@ -32,8 +43,7 @@ def parse_rss(rss_url, last_run):
 def get_last_run():
     try:
         # check for the file
-        with open('/tmp/fog-flow-state.json'):
-            json_data = open('/tmp/fog-flow-state.json', 'r')
+        with open('/tmp/fog-flow-state.json', 'r') as json_data:    
             data = json.load(json_data)
             # obtain current state
             last_run = data['last_run']
@@ -53,17 +63,17 @@ def update_last_run(current_run):
 
 
 # convert fogbugz rss date into Unix timestamp
-def unixTime(timestamp, format):
+def unix_time(timestamp, format):
     return calendar.timegm(time.strptime(timestamp, format))
 
 
 if __name__=='__main__':
     current_run = calendar.timegm(time.gmtime())
-    rss_url = fbSettings.RSS_URL
+    rss_url = fbsettings.RSS_URL
     last_run = get_last_run()
     for case_id in parse_rss(rss_url, last_run):
-        json_doc = docBuilder.build(fbSettings.API_URL, case_id)
+        json_doc = docbuilder.build(fbsettings.API_URL, case_id)
         print "uploading " + str(case_id)
-        if not uploader.upload(json_doc):
+        if not upload(json_doc):
             sys.exit(1)
     update_last_run(current_run)

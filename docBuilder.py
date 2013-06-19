@@ -1,111 +1,112 @@
-import json, time, fbSettings, requests, calendar, xmltodict
+import calendar
+import json
+import time
+
 from fogbugz import FogBugz
+import requests
+import xmltodict
 
-# iso format found in fb
-TIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
+import fbsettings
 
-# convert fogbugz time format into Unix timestamp
+
 def unix_time(timestamp):
     if timestamp:
-        return calendar.timegm(time.strptime(timestamp, TIME_FORMAT))
+        return calendar.timegm(time.strptime(timestamp, "%Y-%m-%dT%H:%M:%SZ"))
     else:
         return None
 
-# convert tag to string
-def toString(field): 
-    if field.string:
+def to_string(field):
+    if field:
         return field.string.encode('UTF-8')
     else:
         return None
 
 
-# returns the _rev of a given doc (if it exists)
-def get_rev(_id):
-    r = requests.head(fbSettings.DB_URL + _id, auth=(fbSettings.DB_USER, fbSettings.DB_PASS))
-    if r.status_code < 300:
+def get_rev(case_id):
+    r = requests.head(fbsettings.DB_URL + case_id, auth=(fbsettings.DB_USER, fbsettings.DB_PASS))
+    if r.status_code == 200 or r.status_code == 202:
         return r.headers['etag'].strip('"')
     else:
         return None
 
 
-# returns dict of email fields from an event
-def get_email(evt):         
-    if toString(evt.femail):  # ONLY if email exists
+# return dict of email fields from an event
+def get_email(evt):
+    if to_string(evt.femail):
         email = {}
-        email['from'] = toString(evt.sfrom)
-        email['to'] = toString(evt.sto)
-        email['subject'] = toString(evt.ssubject)
-        email['body'] = toString(evt.sbodytext)
-        email['cc'] = toString(evt.scc)
-        email['timestamp'] = toString(evt.sdate)
+        email['from'] = to_string(evt.sfrom)
+        email['to'] = to_string(evt.sto)
+        email['subject'] = to_string(evt.ssubject)
+        email['body'] = to_string(evt.sbodytext)
+        email['cc'] = to_string(evt.scc)
+        email['timestamp'] = to_string(evt.sdate)
         return email
     else:
         return None
 
 
-# and other essential info
-def get_events(_id, fb):
+# returns a list of the event history for a given case
+def get_events(case_id, fb):
   # request for events on given case
-  respBugEvents = fb.search(q=_id, cols='events')
+  respBugEvents = fb.search(q=case_id, cols='events')
   events = xmltodict.parse(str(respBugEvents))
   events = events['response']['cases']['case']
   events = events['events']['event']
   return events
 
 
-def get_person(case, ixevent):              # get the person's name from the latest occurance 
-    for i in case.events.findAll('event'):  # of a particular type of event with the evt code
-        if toString(i.evt) == ixevent:
-            return toString(i.sperson)
+# get the person's name from the latest occurance
+# of a particular type of event with the evt code
+def get_person(case, ixevent):
+    for i in case.events.findAll('event'):
+        if to_string(i.evt) == ixevent:
+            return to_string(i.sperson)
 
 
-# returns a list of existing tags in a case
 def get_tags(case):
-    li = []
-    for tag in case.tags:
-        li.append(toString(tag))
-    return li
+    return [to_string(tag) for tag in case.tags]
+
 
 # building the actual document
-def build(url, _id):
-    # _id must be in 'gb:####' format
+def build(url, case_id):
+    # case_id must be in 'gb:####' format
     fb = FogBugz(url)
-    fb.logon(fbSettings.API_USER, fbSettings.API_PASS)
+    fb.logon(fbsettings.API_USER, fbsettings.API_PASS)
 
-    case = fb.search(q = str(_id).strip("fb:"), cols = 'sTitle,dtOpened,dtClosed,ixPersonOpenedBy,ixPersonClosedBy,ixPersonResolvedBy,ixPersonLastEditedBy,ixRelatedBugs,sPersonAssignedTo,sStatus,ixPriority,CloudantUser,CloudantCluster,CloudantOrg,tags,ixBugParent,ixBugChildren,dtResolved,dtClosed,dtLastUpdated,sProject,sArea,sCategory,events')
+    case = fb.search(q = str(case_id).strip("fb:"), cols = 'sTitle,dtOpened,dtClosed,ixPersonOpenedBy,ixPersonClosedBy,ixPersonResolvedBy,ixPersonLastEditedBy,ixRelatedBugs,sPersonAssignedTo,sStatus,ixPriority,CloudantUser,CloudantCluster,CloudantOrg,tags,ixBugParent,ixBugChildren,dtResolved,dtClosed,dtLastUpdated,sProject,sArea,sCategory,events')
     
-    # document (dict in JSON format) 
-    doc = { '_id' : _id,
-            'title' : toString(case.stitle),
-            'cloudant_user' : toString(case.cloudantuser),
-            'cloudant_cluster' : toString(case.cloudantcluster),            
-            'cloudant_org' : toString(case.cloudantorg),
-            'area' : toString(case.sarea),
-            'category' : toString(case.scategory),
-            'assignee' : toString(case.spersonassignedto),
-            'assigned' : {'to' : toString(case.spersonassignedto)},
-            'priority' : int(toString(case.ixpriority)),
+    # document (dict in JSON format)
+    doc = { '_id' : case_id,
+            'title' : to_string(case.stitle),
+            'cloudant_user' : to_string(case.cloudantuser),
+            'cloudant_cluster' : to_string(case.cloudantcluster),
+            'cloudant_org' : to_string(case.cloudantorg),
+            'area' : to_string(case.sarea),
+            'category' : to_string(case.scategory),
+            'assignee' : to_string(case.spersonassignedto),
+            'assigned' : {'to' : to_string(case.spersonassignedto)},
+            'priority' : int(to_string(case.ixpriority)),
             'tags' : get_tags(case),
-            'sub_cases' : toString(case.ixbugchildren).split(",") if toString(case.ixbugchildren) else None,
-            'related_cases' : toString(case.ixrelatedbugs).split(",") if toString(case.ixrelatedbugs) else None,
-            'parent_case' : toString(case.ixbugparent),
-            'project' : toString(case.sproject),
-            'status' : toString(case.sstatus),
-            'events' : get_events(_id, fb),
-            'opened' : {'ix' : int(toString(case.ixpersonopenedby)), 'by' : get_person(case,'1'),
-                        'timestamp' : unix_time(toString(case.dtopened))},
-            'closed' : {'ix' : int(toString(case.ixpersonclosedby)), 'by' : get_person(case,'6'),
-                        'timestamp' : unix_time(toString(case.dtclosed))},
-            'resolved' : {'ix' : int(toString(case.ixpersonresolvedby)), 'by' : get_person(case, '14'),
-                        'timestamp' : unix_time(toString(case.dtresolved))},
-            'last_edited' : {'ix' : int(toString(case.ixpersonlasteditedby)),
-                        'by' : toString(case.events.findAll('event')[-1].sperson),
-                        'timestamp' : unix_time(toString(case.dtlastupdated))}
+            'sub_cases' : to_string(case.ixbugchildren).split(",") if to_string(case.ixbugchildren) else None,
+            'related_cases' : to_string(case.ixrelatedbugs).split(",") if to_string(case.ixrelatedbugs) else None,
+            'parent_case' : to_string(case.ixbugparent),
+            'project' : to_string(case.sproject),
+            'status' : to_string(case.sstatus),
+            'events' : get_events(case_id, fb),
+            'opened' : {'ix' : int(to_string(case.ixpersonopenedby)), 'by' : get_person(case,'1'),
+                        'timestamp' : unix_time(to_string(case.dtopened))},
+            'closed' : {'ix' : int(to_string(case.ixpersonclosedby)), 'by' : get_person(case,'6'),
+                        'timestamp' : unix_time(to_string(case.dtclosed))},
+            'resolved' : {'ix' : int(to_string(case.ixpersonresolvedby)), 'by' : get_person(case, '14'),
+                        'timestamp' : unix_time(to_string(case.dtresolved))},
+            'last_edited' : {'ix' : int(to_string(case.ixpersonlasteditedby)),
+                        'by' : to_string(case.events.findAll('event')[-1].sperson),
+                        'timestamp' : unix_time(to_string(case.dtlastupdated))}
             }
-    # add _rev if the document is a revision    
-    _rev = get_rev(doc['_id'])
-    if _rev is not None:
-        doc['_rev'] = _rev
+    # add rev if the document is a revision
+    rev = get_rev(doc['_id'])
+    if rev:
+        doc['_rev'] = rev
 
     fb.logoff() # log off from fogbugz
     return doc
