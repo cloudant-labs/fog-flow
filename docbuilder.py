@@ -8,15 +8,18 @@ import xmltodict
 
 import fbsettings
 
+TIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
-def unix_time(timestamp):
+# convert fogbugz rss date into Unix timestamp
+def unix_time(timestamp, format):
     if timestamp:
-        return calendar.timegm(time.strptime(timestamp, "%Y-%m-%dT%H:%M:%SZ"))
+        return calendar.timegm(time.strptime(timestamp, format))
     else:
         return None
 
+
 def to_string(field):
-    if field:
+    if field.string:
         return field.string.encode('UTF-8')
     else:
         return None
@@ -93,15 +96,14 @@ def build(url, case_id):
             'project' : to_string(case.sproject),
             'status' : to_string(case.sstatus),
             'events' : get_events(case_id, fb),
-            'opened' : {'ix' : int(to_string(case.ixpersonopenedby)), 'by' : get_person(case,'1'),
-                        'timestamp' : unix_time(to_string(case.dtopened))},
-            'closed' : {'ix' : int(to_string(case.ixpersonclosedby)), 'by' : get_person(case,'6'),
-                        'timestamp' : unix_time(to_string(case.dtclosed))},
-            'resolved' : {'ix' : int(to_string(case.ixpersonresolvedby)), 'by' : get_person(case, '14'),
-                        'timestamp' : unix_time(to_string(case.dtresolved))},
-            'last_edited' : {'ix' : int(to_string(case.ixpersonlasteditedby)),
-                        'by' : to_string(case.events.findAll('event')[-1].sperson),
-                        'timestamp' : unix_time(to_string(case.dtlastupdated))}
+            'opened' : {'by' : get_person(case,'1'),
+                        'timestamp' : unix_time(to_string(case.dtopened), TIME_FORMAT)},
+            'closed' : {'by' : get_person(case,'6'),
+                        'timestamp' : unix_time(to_string(case.dtclosed), TIME_FORMAT)},
+            'resolved' : {'by' : get_person(case, '14'),
+                        'timestamp' : unix_time(to_string(case.dtresolved), TIME_FORMAT)},
+            'last_edited' : {'by' : to_string(case.events.findAll('event')[-1].sperson),
+                        'timestamp' : unix_time(to_string(case.dtlastupdated), TIME_FORMAT)}
             }
     # add rev if the document is a revision
     rev = get_rev(doc['_id'])
