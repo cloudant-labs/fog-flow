@@ -1,16 +1,16 @@
 import calendar
+import ConfigParser
 import json
+import re
 import time
 
 from fogbugz import FogBugz
 import requests
 import xmltodict
 
-import fbsettings
-
 TIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
-# convert fogbugz rss date into Unix timestamp
+# convert fogbugz datetime into Unix timestamp
 def unix_time(timestamp, format):
     if timestamp:
         return calendar.timegm(time.strptime(timestamp, format))
@@ -18,97 +18,86 @@ def unix_time(timestamp, format):
         return None
 
 
-def to_string(field):
-    if field.string:
-        return field.string.encode('UTF-8')
-    else:
-        return None
-
-
-def get_rev(case_id):
-    r = requests.head(fbsettings.DB_URL + case_id, auth=(fbsettings.DB_USER, fbsettings.DB_PASS))
+def get_rev(case_id, db_url, db_user, db_pass):
+    r = requests.head(db_url + case_id,
+                    auth=(db_user, db_pass))
     if r.status_code == 200 or r.status_code == 202:
         return r.headers['etag'].strip('"')
     else:
         return None
 
 
-# return dict of email fields from an event
-def get_email(evt):
-    if to_string(evt.femail):
-        email = {}
-        email['from'] = to_string(evt.sfrom)
-        email['to'] = to_string(evt.sto)
-        email['subject'] = to_string(evt.ssubject)
-        email['body'] = to_string(evt.sbodytext)
-        email['cc'] = to_string(evt.scc)
-        email['timestamp'] = to_string(evt.sdate)
-        return email
+# collapse unwanted xml fields, revise names, reformat timestamps
+def prune_doc(doc):
+    doc = doc['response']['cases']['case']
+    doc['events'] = doc['events']['event']
+    del doc['@operations'], doc['ixpersonopenedby']
+    del doc['ixpersonclosedby'], doc['ixpersonresolvedby']
+    del doc['ixpersonlasteditedby'], doc['plugin_customfields']
+    if doc['tags']:
+        doc['tags'] = doc['tags']['tag']
+    events = []
+    for event in reversed(doc['events']):
+        events.append(dict([(transform(key), value)
+                     for key, value in event.items()]))
+    for event in events:
+        event['timestamp'] = unix_time(event['timestamp'], TIME_FORMAT)
+        del event['fhtml'], event['_id'], event['bemail']
+        del event['ixbugevent'], event['sformat'], event['ixperson']
+        del event['ixpersonassignedto'], event['bexternal']
+        if 'shtml' in event: del event['shtml']
+    doc['events'] = events
+    doc = dict([(transform(key), value) for key, value in doc.items()])
+    doc['last_updated'] = unix_time(doc['last_updated'], TIME_FORMAT)
+    doc['date_opened'] = unix_time(doc['date_opened'], TIME_FORMAT)
+    doc['date_closed'] = unix_time(doc['date_closed'], TIME_FORMAT)
+    doc['date_resolved'] = unix_time(doc['date_resolved'], TIME_FORMAT)
+    print json.dumps(doc, indent=4, separators=(',', ': '))
+    return doc
+
+
+# substitute ambiguous key names from fb for preferable names for clarity
+def transform(key):
+    renamings = dict([('@ixbug', '_id'), ('ixpriority', 'priority'), 
+                    ('ixrelatedbugs', 'related_cases'), ('stitle', 'title'),
+                    ('dtopened', 'date_opened'), ('dtclosed', 'date_closed'),
+                    ('spersonassignedto', 'assigned_to'), ('scc', 'cc'),
+                    ('sstatus', 'status'), ('ixbugparent', 'parent_case'),
+                    ('dtresolved', 'date_resolved'), ('sproject', 'project'),
+                    ('sarea', 'area'), ('ixbugchildren', 'sub_cases'),
+                    ('dtlastupdated', 'last_updated'), ('ssubject', 'subject'),
+                    ('scategory', 'category'), ('events', 'events'),
+                    ('@ixbugevent', 'event_id'), ('evt', 'event_code'),
+                    ('sverb', 'event_type'),('dt', 'timestamp'), ('sto', 'to'),
+                    ('s', 'event_text'), ('femail', 'is_email'),
+                    ('fexternal', 'externally_triggered'), ('sfrom', 'from'),
+                    ('schanges', 'changes'), ('rgattachments', 'attachments'),
+                    ('evtdescription', 'event_description'), ('sperson', 'person'),
+                    ('sbcc', 'bcc'), ('sreplyto', 'replyto'), ('sdate', 'send_date'),
+                    ('sbodyhtml', 'body_html'), ('sbodytext', 'body_text')])
+    # hack to get around gross FB api representation of custom fields
+    if key.startswith('plugin_customfields_at_fogcreek_com_'):
+        result = key.replace('plugin_customfields_at_fogcreek_com_', '')[:-2]
+        ending = result[-1:]
+        if re.match('[0-9]', ending):
+            return result[:-2]
+        else:
+            return result[:-1]
+    # end grossness
+    if key in renamings.keys():
+        return renamings[key]
     else:
-        return None
+        return key
 
 
-# returns a list of the event history for a given case
-def get_events(case_id, fb):
-  # request for events on given case
-  respBugEvents = fb.search(q=case_id, cols='events')
-  events = xmltodict.parse(str(respBugEvents))
-  events = events['response']['cases']['case']
-  events = events['events']['event']
-  return events
-
-
-# get the person's name from the latest occurance
-# of a particular type of event with the evt code
-def get_person(case, ixevent):
-    for i in case.events.findAll('event'):
-        if to_string(i.evt) == ixevent:
-            return to_string(i.sperson)
-
-
-def get_tags(case):
-    return [to_string(tag) for tag in case.tags]
-
-
-# building the actual document
-def build(url, case_id):
-    # case_id must be in 'gb:####' format
-    fb = FogBugz(url)
-    fb.logon(fbsettings.API_USER, fbsettings.API_PASS)
-
-    case = fb.search(q = str(case_id).strip("fb:"), cols = 'sTitle,dtOpened,dtClosed,ixPersonOpenedBy,ixPersonClosedBy,ixPersonResolvedBy,ixPersonLastEditedBy,ixRelatedBugs,sPersonAssignedTo,sStatus,ixPriority,CloudantUser,CloudantCluster,CloudantOrg,tags,ixBugParent,ixBugChildren,dtResolved,dtClosed,dtLastUpdated,sProject,sArea,sCategory,events')
-    
-    # document (dict in JSON format)
-    doc = { '_id' : case_id,
-            'title' : to_string(case.stitle),
-            'cloudant_user' : to_string(case.cloudantuser),
-            'cloudant_cluster' : to_string(case.cloudantcluster),
-            'cloudant_org' : to_string(case.cloudantorg),
-            'area' : to_string(case.sarea),
-            'category' : to_string(case.scategory),
-            'assignee' : to_string(case.spersonassignedto),
-            'assigned' : {'to' : to_string(case.spersonassignedto)},
-            'priority' : int(to_string(case.ixpriority)),
-            'tags' : get_tags(case),
-            'sub_cases' : to_string(case.ixbugchildren).split(",") if to_string(case.ixbugchildren) else None,
-            'related_cases' : to_string(case.ixrelatedbugs).split(",") if to_string(case.ixrelatedbugs) else None,
-            'parent_case' : to_string(case.ixbugparent),
-            'project' : to_string(case.sproject),
-            'status' : to_string(case.sstatus),
-            'events' : get_events(case_id, fb),
-            'opened' : {'by' : get_person(case,'1'),
-                        'timestamp' : unix_time(to_string(case.dtopened), TIME_FORMAT)},
-            'closed' : {'by' : get_person(case,'6'),
-                        'timestamp' : unix_time(to_string(case.dtclosed), TIME_FORMAT)},
-            'resolved' : {'by' : get_person(case, '14'),
-                        'timestamp' : unix_time(to_string(case.dtresolved), TIME_FORMAT)},
-            'last_edited' : {'by' : to_string(case.events.findAll('event')[-1].sperson),
-                        'timestamp' : unix_time(to_string(case.dtlastupdated), TIME_FORMAT)}
-            }
+def build(api_url, case_id, api_user, api_pass, db_url, db_user, db_pass):
+    fb = FogBugz(api_url)
+    fb.logon(api_user, api_pass)
+    case = fb.search(q=str(case_id), cols='sTitle,dtOpened,dtClosed,ixPersonOpenedBy,ixPersonClosedBy,ixPersonResolvedBy,ixPersonLastEditedBy,ixRelatedBugs,sPersonAssignedTo,sStatus,ixPriority,tags,ixBugParent,ixBugChildren,dtResolved,dtClosed,dtLastUpdated,sProject,sArea,sCategory,events,plugin_customfields')
+    doc = prune_doc(xmltodict.parse(str(case)))
     # add rev if the document is a revision
-    rev = get_rev(doc['_id'])
+    rev = get_rev(doc['_id'], db_url, db_user, db_pass)
     if rev:
         doc['_rev'] = rev
-
     fb.logoff() # log off from fogbugz
     return doc
