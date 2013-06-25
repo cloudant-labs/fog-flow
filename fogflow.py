@@ -6,6 +6,7 @@ import json
 import sys
 import time
 
+import argparse
 import feedparser
 from fogbugz import FogBugz
 import requests
@@ -118,18 +119,19 @@ def build_doc(api_url, case_id, api_user, api_pass, db_url, db_user, db_pass):
     fb.logon(api_user, api_pass)
     case = fb.search(
         q=str(case_id),
-        cols='sTitle,dtOpened,dtClosed,ixPersonOpenedBy,ixPersonClosedBy,'
-        'ixPersonResolvedBy,ixPersonLastEditedBy,ixRelatedBugs,'
-        'sPersonAssignedTo,sStatus,ixPriority,tags,ixBugParent,'
-        'ixBugChildren,dtResolved,dtClosed,dtLastUpdated,sProject,'
-        'sArea,sCategory,events,plugin_customfields'
+        cols=(
+            'sTitle,dtOpened,dtClosed,ixPersonOpenedBy,ixPersonClosedBy,'
+            'ixPersonResolvedBy,ixPersonLastEditedBy,ixRelatedBugs,'
+            'sPersonAssignedTo,sStatus,ixPriority,tags,ixBugParent,'
+            'ixBugChildren,dtResolved,dtClosed,dtLastUpdated,sProject,'
+            'sArea,sCategory,events,plugin_customfields'
+        )
     )
     doc = prune_doc(xmltodict.parse(str(case)))
     rev = get_rev(doc['_id'], db_url, db_user, db_pass)
     if rev:
         doc['_rev'] = rev
     fb.logoff()
-    print json.dumps(doc, indent=4, separators=(",", "; "))
     return doc
 
 
@@ -199,7 +201,6 @@ def main(configfile):
         )
         if not upload_doc(json_doc, db_url, db_user, db_pass):
             sys.exit(1)
-    print "successful"
     update_last_run(current_run, tempfile)
 
 
