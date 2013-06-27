@@ -3,10 +3,10 @@
 import calendar
 import ConfigParser
 import json
+from optparse import OptionParser
 import sys
 import time
 
-import argparse
 import feedparser
 from fogbugz import FogBugz
 import requests
@@ -14,14 +14,23 @@ import xmltodict
 
 FB_TIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
+rss_url = None
+api_url = None
+db_url = None
+api_user = None
+db_user = None
+api_pass = None
+db_pass = None
+fb =  None
+
+
 def unix_time(timestamp, format):
     if timestamp:
         return calendar.timegm(time.strptime(timestamp, format))
     else:
         return None
 
-
-def get_rev(case_id, db_url, db_user, db_pass):
+def get_rev(case_id):
     r = requests.head(
         db_url + case_id,
         auth=(db_user, db_pass)
@@ -30,7 +39,6 @@ def get_rev(case_id, db_url, db_user, db_pass):
         return r.headers['etag'].strip('"')
     else:
         return None
-
 
 def prune_doc(doc):
     excludekeys = [
@@ -51,7 +59,6 @@ def prune_doc(doc):
     d['date_resolved'] = unix_time(d['date_resolved'], FB_TIME_FORMAT)
     return d
 
-
 def prune_event(event):
     excludekeys = [
         'ixbugevent', 'ixpersonassignedto', 'shtml', 'fhtml', 'smessageid',
@@ -64,7 +71,6 @@ def prune_event(event):
     ])
     e['timestamp'] = unix_time(e['timestamp'], FB_TIME_FORMAT)
     return e
-
 
 def transform(key):
     renamings = {
@@ -103,7 +109,7 @@ def transform(key):
             'plugin_customfields_at_fogcreek_com_', '')[:-2].replace('x', '_')
         if "__" in result:
             result = result.replace('__', '_x')
-        # remove odd character sequence at end of key
+        # remove trailing characters on key
         if result[-1:].isdigit():
             return result[:-2]
         else:
@@ -113,10 +119,7 @@ def transform(key):
     else:
         return key
 
-
-def build_doc(api_url, case_id, api_user, api_pass, db_url, db_user, db_pass):
-    fb = FogBugz(api_url)
-    fb.logon(api_user, api_pass)
+def build_doc(case_id):
     case = fb.search(
         q=str(case_id),
         cols=(
@@ -128,14 +131,12 @@ def build_doc(api_url, case_id, api_user, api_pass, db_url, db_user, db_pass):
         )
     )
     doc = prune_doc(xmltodict.parse(str(case)))
-    rev = get_rev(doc['_id'], db_url, db_user, db_pass)
+    rev = get_rev(doc['_id'])
     if rev:
         doc['_rev'] = rev
-    fb.logoff()
     return doc
 
-
-def parse_rss(rss_url, last_run):
+def parse_rss(last_run):
     fp = feedparser.parse(rss_url)
     updates = []
     for entry in fp.entries:
@@ -148,8 +149,8 @@ def parse_rss(rss_url, last_run):
             updates.append(case)
     return updates
 
-
-def upload_doc(json_doc, db_url, db_user, db_pass):
+def upload_doc(json_doc):
+    print "up"
     headers = {"content-type": "application/json"}
     resp = requests.post(
         db_url,
@@ -159,6 +160,12 @@ def upload_doc(json_doc, db_url, db_user, db_pass):
     )
     return resp.status_code in [201, 202]
 
+def most_recent_case():
+    case = xmltodict.parse(str(fb.search(
+        q='opened:"-7d.." orderby:dateopened',
+        max=1
+    )))
+    return int(case['response']['cases']['case']['@ixbug'])
 
 def get_last_run(tempfile):
     try:
@@ -168,18 +175,52 @@ def get_last_run(tempfile):
     except IOError:
         return 0
 
-
 def update_last_run(current_run, tempfile):
     with open(tempfile, 'w') as f:
         data = {}
         data['last_run'] = current_run
         json.dump(data, f)
 
+def upload_range(startcase, endcase):
+    for case_id in range(startcase, endcase):
+        case = fb.search(q=case_id)
+        if int(xmltodict.parse(str(case))['response']['cases']['@count']) > 0:
+            json_doc = build_doc(case_id)
+            if not upload_doc(json_doc):
+                sys.exit(1)
 
-def main(configfile):
-    config = ConfigParser.RawConfigParser()
-    config.read(configfile)
+def main():
+    global fb, db_url, db_user, db_pass, api_url, api_user, api_pass, rss_url
     current_run = calendar.timegm(time.gmtime())
+    optparser = OptionParser()
+    optparser.add_option(
+        '-c',
+        dest='config_file',
+        help='config file path',
+        default='./flow.ini'
+    )
+    optparser.add_option(
+        '-a',
+        '--allcases',
+        action='store_true',
+        dest='allcases',
+        default=False, 
+        help='force upload of all fb cases that exist, may take a long time'
+    )
+    optparser.add_option(
+        '-r',
+        '--range',
+        type='int',
+        nargs=2,
+        dest='rangeupload',
+        default=False,
+        help='upload all cases in the specified range of '
+                'case IDs in addition to any new edits'
+    )
+    (options, args) = optparser.parse_args()
+
+    config = ConfigParser.RawConfigParser()
+    config.read(options.config_file)
     rss_url = config.get('FogBugz', 'rss_url')
     api_url = config.get('FogBugz', 'api_url')
     api_user = config.get("FogBugz", 'api_user')
@@ -188,23 +229,27 @@ def main(configfile):
     db_user = config.get("Cloudant", 'db_user')
     db_pass = config.get("Cloudant", 'db_pass')
     tempfile = config.get("LastRun", 'tempfile')
-    last_run = get_last_run(tempfile)
-    for case_id in parse_rss(rss_url, last_run):
-        json_doc = build_doc(
-            api_url,
-            case_id,
-            api_user,
-            api_pass,
-            db_url,
-            db_user,
-            db_pass
-        )
-        if not upload_doc(json_doc, db_url, db_user, db_pass):
-            sys.exit(1)
-    update_last_run(current_run, tempfile)
 
+    fb = FogBugz(api_url)
+    fb.logon(api_user, api_pass)
+    
+    last_run = get_last_run(tempfile)
+    # -a
+    if (options.allcases):
+        num_cases = most_recent_case()
+        upload_range(1, num_cases + 1)
+        update_last_run(current_run, tempfile)
+    # default
+    else:
+        for case_id in parse_rss(last_run):
+            json_doc = build_doc(case_id)
+            if not upload_doc(json_doc):
+                sys.exit(1)
+        # -r
+        if (options.rangeupload):
+            upload_range(options.rangeupload[0], options.rangeupload[1] + 1)
+        update_last_run(current_run, tempfile)
 
 if __name__=='__main__':
-    configfile = sys.argv[1]
-    main(configfile)
+    main()
 
