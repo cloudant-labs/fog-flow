@@ -9,16 +9,16 @@ allowing for thorough cataloguing of case content and metadata for use in metric
 
 Running fog-flow requires access to a Cloudant account and database:
 
-1) Visit https://cloudant.com/sign-up/ to create a free account.
-2) After the account is set up, create a database in Cloudant where FogBugz data will reside.
-3) fog-flow requires a config file, a template for which can be found as flow.ini, follow this format in creating your own
+1. Visit https://cloudant.com/sign-up/ to create a free account.
+2. After the account is set up, create a database in Cloudant where FogBugz data will reside.
+3. fog-flow requires a config file, a template for which can be found as flow.ini, follow this format in creating your own
 
 ##Usage
 
 NOTE: fog-flow is designed to run repeatedly in a scheduled manner, so that it is more or less continuously watching the target RSS feed
 for case edits, this can be done via the unix `cron` (https://en.wikipedia.org/wiki/Cron) command or another similiar task scheduler.
 
-###First-time setup
+###First run
 
 Before fog-flow can reliably track new edits to cases, it first needs to upload all of the previously existing cases in FogBugz.
 
