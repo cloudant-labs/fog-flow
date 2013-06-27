@@ -238,18 +238,14 @@ def main():
     if (options.allcases):
         num_cases = most_recent_case()
         upload_range(1, num_cases + 1)
-        update_last_run(current_run, tempfile)
-    # default
+    elif (options.rangeupload):
+        upload_range(options.rangeupload[0], options.rangeupload[1] + 1)
     else:
         for case_id in parse_rss(last_run):
             json_doc = build_doc(case_id)
             if not upload_doc(json_doc):
                 sys.exit(1)
-        # -r
-        if (options.rangeupload):
-            upload_range(options.rangeupload[0], options.rangeupload[1] + 1)
         update_last_run(current_run, tempfile)
 
 if __name__=='__main__':
     main()
-

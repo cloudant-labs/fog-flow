@@ -1,5 +1,5 @@
 #fog-flow
-A python script for continuously storing case data gathered from an instance of Fog Creek's FogBugz
+A python script for storing case data gathered from an instance of Fog Creek's FogBugz
 bug tracking service in a Cloudant database.
 
 Cases from FogBugz are stored as json documents in the Cloudant distributed database service,
@@ -7,27 +7,34 @@ allowing for thorough cataloguing of case content and metadata for use in metric
 
 ##Setup
 
-Running fog-flow requires access to a Cloudant account and database.
+Running fog-flow requires access to a Cloudant account and database:
 
-If you do not have an account set up with Cloudant yet, visit https://cloudant.com/sign-up/
-and create a free account.
-
-Once the account is set up, you should create a database in Cloudant where your FogBugz data will reside.
-
-Running fog-flow requires an accompanying config file, a template for which is included in the fog-flow github repo as flow.ini
-
-Once you have a config file that follows this format (substituting the correct account info)
-you should be able to run the script and begin tracking FogBugz cases. 
-
-One thing to be sure of is that you have included to URL to the RSS feed for the specific FogBugz filter you wish to track cases with in your flow.ini file.
+1) Visit https://cloudant.com/sign-up/ to create a free account.
+2) After the account is set up, create a database in Cloudant where FogBugz data will reside.
+3) fog-flow requires a config file, a template for which can be found as flow.ini, follow this format in creating your own
 
 ##Usage
 
 NOTE: fog-flow is designed to run repeatedly in a scheduled manner, so that it is more or less continuously watching the target RSS feed
-for case edits, we recommend accomplishing this via the unix `cron` command or another similiar task scheduler.
+for case edits, this can be done via the unix `cron` (https://en.wikipedia.org/wiki/Cron) command or another similiar task scheduler.
 
-To run the script once, enter the following on the command line:
+###First-time setup
 
-	python fogflow.py ./flow.ini
+Before fog-flow can reliably track new edits to cases, it first needs to upload all of the previously existing cases in FogBugz.
 
-(if flow.ini isn't saved in the same directory as fogflow.py specify the correct filepath)#fog-flow
+To upload all documents that exist run
+
+    $ python fogflow.py -a
+
+Be aware that this startup operation can take a long time to complete, depending on the number of cases in your FogBugz history
+
+If it isn't necessary for you to track old cases, you can skip this step
+
+###Getting it up and running
+
+Running normally is as simple as calling
+
+    $ python fogflow.py
+
+on a scheduled basis in order to continuously check for new updates to cases; 
+as mentioned before `cron` works well for this
