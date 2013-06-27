@@ -150,7 +150,6 @@ def parse_rss(last_run):
     return updates
 
 def upload_doc(json_doc):
-    print "up"
     headers = {"content-type": "application/json"}
     resp = requests.post(
         db_url,
