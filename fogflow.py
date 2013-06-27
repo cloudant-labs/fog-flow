@@ -15,11 +15,11 @@ import xmltodict
 FB_TIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
 rss_url = None
-api_url = None
+fb_url = None
 db_url = None
-api_user = None
+fb_user = None
 db_user = None
-api_pass = None
+fb_pass = None
 db_pass = None
 fb =  None
 
@@ -190,7 +190,7 @@ def upload_range(startcase, endcase):
                 sys.exit(1)
 
 def main():
-    global fb, db_url, db_user, db_pass, api_url, api_user, api_pass, rss_url
+    global fb, db_url, db_user, db_pass, fb_url, fb_user, fb_pass, rss_url
     current_run = calendar.timegm(time.gmtime())
     optparser = OptionParser()
     optparser.add_option(
@@ -222,16 +222,16 @@ def main():
     config = ConfigParser.RawConfigParser()
     config.read(options.config_file)
     rss_url = config.get('FogBugz', 'rss_url')
-    api_url = config.get('FogBugz', 'api_url')
-    api_user = config.get("FogBugz", 'api_user')
-    api_pass = config.get("FogBugz", 'api_pass')
+    fb_url = config.get('FogBugz', 'fb_url')
+    fb_user = config.get("FogBugz", 'fb_user')
+    fb_pass = config.get("FogBugz", 'fb_pass')
     db_url = config.get("Cloudant", 'db_url')
     db_user = config.get("Cloudant", 'db_user')
     db_pass = config.get("Cloudant", 'db_pass')
     tempfile = config.get("LastRun", 'tempfile')
 
-    fb = FogBugz(api_url)
-    fb.logon(api_user, api_pass)
+    fb = FogBugz(fb_url)
+    fb.logon(fb_user, fb_pass)
     
     last_run = get_last_run(tempfile)
     # -a
