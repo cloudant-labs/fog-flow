@@ -7,6 +7,10 @@ allowing for thorough cataloguing of case content and metadata for use in metric
 
 ##Setup
 
+First of all, there are a few required python libraries:
+
+     $ pip install feedparser fogbugz requests xmltodict
+
 Running fog-flow requires access to a Cloudant account and database:
 
 1. Visit https://cloudant.com/sign-up/ to create a free account.
