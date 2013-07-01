@@ -13,6 +13,7 @@ import requests
 import xmltodict
 
 FB_TIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
+MAX_RETRIES = 10
 
 rss_url = None
 fb_url = None
@@ -191,11 +192,12 @@ def upload_range(startcase, endcase):
     for case_id in range(startcase, endcase):
         case = fb.search(q=case_id)
         if int(xmltodict.parse(str(case))['response']['cases']['@count']) > 0:
-            json_doc = build_doc(case_id)
-            while not upload_doc(json_doc):
-                retries = retries + 1
-                if retries > 10:
-                    sys.stderr.write('Failed to upload doc ' + str(case_id))
+            doc = build_doc(case_id)
+            retries = 0
+            while not upload_doc(doc):
+                retries += 1
+                if retries > MAX_RETRIES:
+                    sys.stderr.write('Failed to upload doc %s' % case_id)
                     sys.exit(1)
 
 def main():
@@ -252,12 +254,13 @@ def main():
     else:
         updates = parse_rss(last_run)
         for case_id in updates:
-            json_doc = build_doc(case_id)
+            doc = build_doc(case_id)
             retries = 0
-            while not upload_doc(json_doc):
-                retries = retries + 1
-                if retries > 10:
-                    sys.stderr.write('Failed to upload doc ' + str(case_id))
+            while not upload_doc(doc):
+                updates.insert(0, case_id)
+                retries += 1
+                if retries > MAX_RETRIES:
+                    sys.stderr.write('Failed to upload doc %s' % case_id)
                     sys.exit(1)
         update_last_run(current_run, tempfile)
 
