@@ -255,6 +255,7 @@ def main():
                 updates.insert(0, case_id)
                 retries = retries + 1
                 if retries > 10:
+                    sys.stderr.write('Failed to upload doc ' + str(case_id))
                     sys.exit(1)
         update_last_run(current_run, tempfile)
 
