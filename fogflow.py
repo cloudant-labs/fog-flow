@@ -130,9 +130,6 @@ def build_doc(case_id):
         )
     )
     doc = prune_doc(xmltodict.parse(str(case)))
-    rev = get_rev(doc['_id'])
-    if rev:
-        doc['_rev'] = rev
     return doc
 
 def parse_rss(last_run):
@@ -153,13 +150,16 @@ def parse_rss(last_run):
         pass
     return updates
 
-def upload_doc(json_doc):
+def upload_doc(doc):
     headers = {"content-type": "application/json"}
     try:
+        rev = get_rev(doc['_id'])
+        if rev:
+            doc['_rev'] = rev
         resp = requests.post(
             db_url,
             auth=(db_user, db_pass),
-            data=json.dumps(json_doc),
+            data=json.dumps(doc),
             headers=headers
         )
     except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
