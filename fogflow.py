@@ -192,8 +192,11 @@ def upload_range(startcase, endcase):
         case = fb.search(q=case_id)
         if int(xmltodict.parse(str(case))['response']['cases']['@count']) > 0:
             json_doc = build_doc(case_id)
-            if not upload_doc(json_doc):
-                sys.exit(1)
+            while not upload_doc(json_doc):
+                retries = retries + 1
+                if retries > 10:
+                    sys.stderr.write('Failed to upload doc ' + str(case_id))
+                    sys.exit(1)
 
 def main():
     global fb, db_url, db_user, db_pass, fb_url, fb_user, fb_pass, rss_url
@@ -251,8 +254,7 @@ def main():
         for case_id in updates:
             json_doc = build_doc(case_id)
             retries = 0
-            if not upload_doc(json_doc):
-                updates.insert(0, case_id)
+            while not upload_doc(json_doc):
                 retries = retries + 1
                 if retries > 10:
                     sys.stderr.write('Failed to upload doc ' + str(case_id))
