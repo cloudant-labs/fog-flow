@@ -23,7 +23,6 @@ fb_pass = None
 db_pass = None
 fb =  None
 
-
 def unix_time(timestamp, format):
     if timestamp:
         return calendar.timegm(time.strptime(timestamp, format))
@@ -147,16 +146,23 @@ def parse_rss(last_run):
         if timestamp > last_run:
             case = entry.title.split(':')[0].lstrip('Case ')
             updates.append(case)
+    last_entry = entries[len(entries-1)]
+    last_case = last_entry.title.split(':')[0].lstrip('Case ')
+    if last_case in updates:
+        # log that the 200th case has been reached, possible missing cases
     return updates
 
 def upload_doc(json_doc):
     headers = {"content-type": "application/json"}
-    resp = requests.post(
-        db_url,
-        auth=(db_user, db_pass),
-        data=json.dumps(json_doc),
-        headers=headers
-    )
+    try:
+        resp = requests.post(
+            db_url,
+            auth=(db_user, db_pass),
+            data=json.dumps(json_doc),
+            headers=headers
+        )
+    except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
+        return False
     return resp.status_code in [201, 202]
 
 def most_recent_case():
@@ -240,10 +246,15 @@ def main():
     elif (options.rangeupload):
         upload_range(options.rangeupload[0], options.rangeupload[1] + 1)
     else:
-        for case_id in parse_rss(last_run):
+        updates = parse_rss(last_run)
+        for case_id in updates:
             json_doc = build_doc(case_id)
+            retries = 0
             if not upload_doc(json_doc):
-                sys.exit(1)
+                updates.insert(0, case_id)
+                retries = retries + 1
+                if retries > 10:
+                    sys.exit(1)
         update_last_run(current_run, tempfile)
 
 if __name__=='__main__':
