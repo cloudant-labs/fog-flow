@@ -257,7 +257,6 @@ def main():
             doc = build_doc(case_id)
             retries = 0
             while not upload_doc(doc):
-                updates.insert(0, case_id)
                 retries += 1
                 if retries > MAX_RETRIES:
                     sys.stderr.write('Failed to upload doc %s' % case_id)
