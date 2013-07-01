@@ -150,6 +150,7 @@ def parse_rss(last_run):
     last_case = last_entry.title.split(':')[0].lstrip('Case ')
     if last_case in updates:
         # log that the 200th case has been reached, possible missing cases
+        pass
     return updates
 
 def upload_doc(json_doc):
