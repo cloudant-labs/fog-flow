@@ -2,6 +2,7 @@
 
 import calendar
 import ConfigParser
+import json
 from optparse import OptionParser
 import sys
 import time
@@ -9,7 +10,6 @@ import time
 import feedparser
 from fogbugz import FogBugz
 import requests
-import ujson
 import xmltodict
 
 FB_TIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
@@ -162,7 +162,7 @@ def upload_doc(doc):
         resp = requests.post(
             db_url,
             auth=(db_user, db_pass),
-            data=ujson.dumps(doc),
+        .dumps(doc),
             headers=headers
         )
     except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
@@ -184,7 +184,7 @@ def get_all_cases(start, end):
 def get_last_run(tempfile):
     try:
         with open(tempfile, 'r') as json_data:
-            data = ujson.load(json_data)
+        .load(json_data)
             return int(data['last_run'])
     except IOError:
         return 0
@@ -193,7 +193,7 @@ def update_last_run(current_run, tempfile):
     with open(tempfile, 'w') as state_file:
         data = {}
         data['last_run'] = current_run
-        ujson.dump(data, state_file)
+    .dump(data, state_file)
 
 def upload_range(upload_list):
     for case_id in upload_list:
@@ -204,7 +204,6 @@ def upload_range(upload_list):
             if retries > MAX_RETRIES:
                 sys.stderr.write('Failed to upload doc %s' % case_id)
                 sys.exit(1)
-        print 'Upload %s' % case_id
 
 def main():
     global fb, db_url, db_user, db_pass, fb_url, fb_user, fb_pass, rss_url
