@@ -248,20 +248,20 @@ def main():
 
     fb = FogBugz(fb_url)
     fb.logon(fb_user, fb_pass)
-    
     last_run = get_last_run(tempfile)
-    # -a
+    uploads = []
     if (options.allcases):
+        # -a
         uploads = get_all_cases()
-    # -r
     elif (options.rangeupload):
+        # -r
         # note that this can be queried to obtain an actual list of existing
         # cases in this range (much like above)
         uploads = range(options.rangeupload[0], options.rangeupload[1] + 1)
-    # default
     else:
-        updates = parse_rss(last_run)
-    upload_range(updates)
+        # default
+        uploads = parse_rss(last_run)
+    upload_range(uploads)
     if not (options.allcases or options.rangeupload):
         update_last_run(current_run, tempfile)
 
