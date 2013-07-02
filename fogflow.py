@@ -2,7 +2,6 @@
 
 import calendar
 import ConfigParser
-import json
 from optparse import OptionParser
 import sys
 import time
@@ -10,6 +9,7 @@ import time
 import feedparser
 from fogbugz import FogBugz
 import requests
+import ujson
 import xmltodict
 
 FB_TIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
@@ -162,27 +162,28 @@ def upload_doc(doc):
         resp = requests.post(
             db_url,
             auth=(db_user, db_pass),
-            data=json.dumps(doc),
+            data=ujson.dumps(doc),
             headers=headers
         )
     except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
         return False
     return resp.status_code in [201, 202]
 
-def get_all_cases():
+def get_all_cases(start, end):
     all_cases = []
     case_info = xmltodict.parse(str(fb.search(
         q='orderby:dateopened',
         max=sys.maxint
     )))
     for key in case_info['response']['cases']['case']:
-        all_cases.append(key['@ixbug'])
+        if key['@ixbug'] in range(start, end):
+            all_cases.append(key['@ixbug'])
     return all_cases
 
 def get_last_run(tempfile):
     try:
         with open(tempfile, 'r') as json_data:
-            data = json.load(json_data)
+            data = ujson.load(json_data)
             return int(data['last_run'])
     except IOError:
         return 0
@@ -191,19 +192,18 @@ def update_last_run(current_run, tempfile):
     with open(tempfile, 'w') as state_file:
         data = {}
         data['last_run'] = current_run
-        json.dump(data, state_file)
+        ujson.dump(data, state_file)
 
 def upload_range(upload_list):
     for case_id in upload_list:
-        case = fb.search(q=case_id)
-        if int(xmltodict.parse(str(case))['response']['cases']['@count']) > 0:
-            doc = build_doc(case_id)
-            retries = 0
-            while not upload_doc(doc):
-                retries += 1
-                if retries > MAX_RETRIES:
-                    sys.stderr.write('Failed to upload doc %s' % case_id)
-                    sys.exit(1)
+        doc = build_doc(case_id)
+        retries = 0
+        while not upload_doc(doc):
+            retries += 1
+            if retries > MAX_RETRIES:
+                sys.stderr.write('Failed to upload doc %s' % case_id)
+                sys.exit(1)
+        print 'Upload %s' % case_id
 
 def main():
     global fb, db_url, db_user, db_pass, fb_url, fb_user, fb_pass, rss_url
@@ -234,7 +234,6 @@ def main():
                 'case IDs in addition to any new edits'
     )
     (options, args) = optparser.parse_args()
-
     config = ConfigParser.RawConfigParser()
     config.read(options.config_file)
     rss_url = config.get('FogBugz', 'rss_url')
@@ -252,18 +251,20 @@ def main():
     uploads = []
     if (options.allcases):
         # -a
-        uploads = get_all_cases()
+        uploads = get_all_cases(1, sys.maxint)
     elif (options.rangeupload):
         # -r
-        # note that this can be queried to obtain an actual list of existing
-        # cases in this range (much like above)
-        uploads = range(options.rangeupload[0], options.rangeupload[1] + 1)
+        uploads = get_all_cases(
+            options.rangeupload[0],
+            options.rangeupload[1] + 1
+        )
     else:
         # default
         uploads = parse_rss(last_run)
     upload_range(uploads)
     if not (options.allcases or options.rangeupload):
         update_last_run(current_run, tempfile)
+    fb.logoff()
 
 if __name__ == '__main__':
     main()
