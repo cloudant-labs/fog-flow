@@ -172,11 +172,12 @@ def upload_doc(doc):
 def get_all_cases(start, end):
     all_cases = []
     case_info = xmltodict.parse(str(fb.search(
-        q='orderby:dateopened',
+        q='type:"Cases"',
         max=sys.maxint
     )))
     for key in case_info['response']['cases']['case']:
-        if key['@ixbug'] in range(start, end):
+        case_num = int(key['@ixbug'])
+        if (case_num >= start and case_num <= end):
             all_cases.append(key['@ixbug'])
     return all_cases
 
@@ -256,7 +257,7 @@ def main():
         # -r
         uploads = get_all_cases(
             options.rangeupload[0],
-            options.rangeupload[1] + 1
+            options.rangeupload[1]
         )
     else:
         # default
