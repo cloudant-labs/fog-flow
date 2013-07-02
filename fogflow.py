@@ -162,7 +162,7 @@ def upload_doc(doc):
         resp = requests.post(
             db_url,
             auth=(db_user, db_pass),
-        .dumps(doc),
+            data=json.dumps(doc),
             headers=headers
         )
     except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
@@ -184,7 +184,7 @@ def get_all_cases(start, end):
 def get_last_run(tempfile):
     try:
         with open(tempfile, 'r') as json_data:
-        .load(json_data)
+            data = json.load(json_data)
             return int(data['last_run'])
     except IOError:
         return 0
@@ -193,7 +193,7 @@ def update_last_run(current_run, tempfile):
     with open(tempfile, 'w') as state_file:
         data = {}
         data['last_run'] = current_run
-    .dump(data, state_file)
+        json.dump(data, state_file)
 
 def upload_range(upload_list):
     for case_id in upload_list:
