@@ -24,19 +24,19 @@ fb_pass = None
 db_pass = None
 fb =  None
 
-def unix_time(timestamp, format):
+def unix_time(timestamp, formatting):
     if timestamp:
-        return calendar.timegm(time.strptime(timestamp, format))
+        return calendar.timegm(time.strptime(timestamp, formatting))
     else:
         return None
 
 def get_rev(case_id):
-    r = requests.head(
+    resp = requests.head(
         db_url + case_id,
         auth=(db_user, db_pass)
     )
-    if r.status_code == 200:
-        return r.headers['etag'].strip('"')
+    if resp.status_code == 200:
+        return resp.headers['etag'].strip('"')
     else:
         return None
 
@@ -169,12 +169,15 @@ def upload_doc(doc):
         return False
     return resp.status_code in [201, 202]
 
-def most_recent_case():
-    case = xmltodict.parse(str(fb.search(
-        q='opened:"-7d.." orderby:dateopened',
-        max=1
+def get_all_cases():
+    all_cases = []
+    case_info = xmltodict.parse(str(fb.search(
+        q='orderby:dateopened',
+        max=sys.maxint
     )))
-    return int(case['response']['cases']['case']['@ixbug'])
+    for key in case_info['response']['cases']['case']:
+        all_cases.append(key['@ixbug'])
+    return all_cases
 
 def get_last_run(tempfile):
     try:
@@ -185,10 +188,10 @@ def get_last_run(tempfile):
         return 0
 
 def update_last_run(current_run, tempfile):
-    with open(tempfile, 'w') as f:
+    with open(tempfile, 'w') as state_file:
         data = {}
         data['last_run'] = current_run
-        json.dump(data, f)
+        json.dump(data, state_file)
 
 def upload_range(upload_list):
     for case_id in upload_list:
@@ -249,16 +252,18 @@ def main():
     last_run = get_last_run(tempfile)
     # -a
     if (options.allcases):
-        num_cases = most_recent_case()
-        upload_range(range(1, num_cases + 1))
+        uploads = get_all_cases()
     # -r
     elif (options.rangeupload):
-        upload_range(range(options.rangeupload[0], options.rangeupload[1] + 1))
+        # note that this can be queried to obtain an actual list of existing
+        # cases in this range (much like above)
+        uploads = range(options.rangeupload[0], options.rangeupload[1] + 1)
     # default
     else:
         updates = parse_rss(last_run)
-        upload_range(updates)
+    upload_range(updates)
+    if not (options.allcases or options.rangeupload):
         update_last_run(current_run, tempfile)
 
-if __name__=='__main__':
+if __name__ == '__main__':
     main()
