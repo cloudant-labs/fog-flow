@@ -136,7 +136,8 @@ def build_doc(case_id):
 def parse_rss(last_run):
     fp = feedparser.parse(rss_url)
     updates = []
-    for entry in fp.entries:
+    entries = fp.entries
+    for entry in entries:
         timestamp = unix_time(
             entry.published,
             "%a, %d %b %Y %H:%M:%S %Z"
@@ -144,10 +145,11 @@ def parse_rss(last_run):
         if timestamp > last_run:
             case = entry.title.split(':')[0].lstrip('Case ')
             updates.append(case)
-    last_entry = entries[len(entries-1)]
+    last_entry = entries[len(entries)-1]
     last_case = last_entry.title.split(':')[0].lstrip('Case ')
     if last_case in updates:
-        # log that the 200th case has been reached, possible missing cases
+        # log that the 200th case edit has been reached, possible missing edits
+        # advise a -a run for full recovery
         pass
     return updates
 
@@ -188,8 +190,8 @@ def update_last_run(current_run, tempfile):
         data['last_run'] = current_run
         json.dump(data, f)
 
-def upload_range(startcase, endcase):
-    for case_id in range(startcase, endcase):
+def upload_range(upload_list):
+    for case_id in upload_list:
         case = fb.search(q=case_id)
         if int(xmltodict.parse(str(case))['response']['cases']['@count']) > 0:
             doc = build_doc(case_id)
@@ -248,19 +250,14 @@ def main():
     # -a
     if (options.allcases):
         num_cases = most_recent_case()
-        upload_range(1, num_cases + 1)
+        upload_range(range(1, num_cases + 1))
+    # -r
     elif (options.rangeupload):
-        upload_range(options.rangeupload[0], options.rangeupload[1] + 1)
+        upload_range(range(options.rangeupload[0], options.rangeupload[1] + 1))
+    # default
     else:
         updates = parse_rss(last_run)
-        for case_id in updates:
-            doc = build_doc(case_id)
-            retries = 0
-            while not upload_doc(doc):
-                retries += 1
-                if retries > MAX_RETRIES:
-                    sys.stderr.write('Failed to upload doc %s' % case_id)
-                    sys.exit(1)
+        upload_range(updates)
         update_last_run(current_run, tempfile)
 
 if __name__=='__main__':
