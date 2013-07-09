@@ -151,7 +151,6 @@ def parse_rss(last_run):
     parser = feedparser.parse(RSS_URL)
     updates = []
     entries = parser.entries
-    print parser.entries
     for entry in entries:
         timestamp = unix_time(
             entry.published,
@@ -160,7 +159,6 @@ def parse_rss(last_run):
         if timestamp > last_run:
             case = entry.title.split(':')[0].lstrip('Case ')
             updates.append(case)
-    print len(entries)
     last_entry = entries[len(entries)-1]
     last_case = last_entry.title.split(':')[0].lstrip('Case ')
     if last_case in updates:
@@ -183,9 +181,6 @@ def upload_doc(doc):
         )
     except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
         return False
-    print resp.status_code
-    print DB_USER
-    print DB_PASS
     return resp.status_code in [201, 202]
 
 def get_all_cases(start, end):
