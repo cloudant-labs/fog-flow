@@ -15,14 +15,28 @@ import xmltodict
 FB_TIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 MAX_RETRIES = 10
 
-rss_url = None
-fb_url = None
-db_url = None
-fb_user = None
-db_user = None
-fb_pass = None
-db_pass = None
+RSS_URL = None
+FB_URL = None
+DB_URL = None
+FB_USER = None
+DB_USER = None
+FB_PASS = None
+DB_PASS = None
+LOG_FILE = None
 fb =  None
+
+def config_parse(config_file):
+    global RSS_URL, FB_URL, DB_URL, FB_USER, DB_USER, FB_PASS, DB_PASS, LOG_FILE
+    config = ConfigParser.RawConfigParser()
+    config.read(config_file)
+    RSS_URL = config.get('FogBugz', 'rss_url')
+    FB_URL = config.get('FogBugz', 'fb_url')
+    FB_USER = config.get("FogBugz", 'fb_user')
+    FB_PASS = config.get("FogBugz", 'fb_pass')
+    DB_URL = config.get("Cloudant", 'db_url')
+    DB_USER = config.get("Cloudant", 'db_user')
+    DB_PASS = config.get("Cloudant", 'db_pass')
+    LOG_FILE = config.get("LastRun", 'tempfile')
 
 def unix_time(timestamp, formatting):
     if timestamp:
@@ -32,8 +46,8 @@ def unix_time(timestamp, formatting):
 
 def get_rev(case_id):
     resp = requests.head(
-        db_url + case_id,
-        auth=(db_user, db_pass)
+        DB_URL + case_id,
+        auth=(DB_USER, DB_PASS)
     )
     if resp.status_code == 200:
         return resp.headers['etag'].strip('"')
@@ -134,9 +148,10 @@ def build_doc(case_id):
     return doc
 
 def parse_rss(last_run):
-    fp = feedparser.parse(rss_url)
+    parser = feedparser.parse(RSS_URL)
     updates = []
-    entries = fp.entries
+    entries = parser.entries
+    print parser.entries
     for entry in entries:
         timestamp = unix_time(
             entry.published,
@@ -145,6 +160,7 @@ def parse_rss(last_run):
         if timestamp > last_run:
             case = entry.title.split(':')[0].lstrip('Case ')
             updates.append(case)
+    print len(entries)
     last_entry = entries[len(entries)-1]
     last_case = last_entry.title.split(':')[0].lstrip('Case ')
     if last_case in updates:
@@ -160,13 +176,16 @@ def upload_doc(doc):
         if rev:
             doc['_rev'] = rev
         resp = requests.post(
-            db_url,
-            auth=(db_user, db_pass),
+            DB_URL,
+            auth=(DB_USER, DB_PASS),
             data=json.dumps(doc),
             headers=headers
         )
     except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
         return False
+    print resp.status_code
+    print DB_USER
+    print DB_PASS
     return resp.status_code in [201, 202]
 
 def get_all_cases(start, end):
@@ -177,20 +196,20 @@ def get_all_cases(start, end):
     )))
     for key in case_info['response']['cases']['case']:
         case_num = int(key['@ixbug'])
-        if (case_num >= start and case_num <= end):
+        if (start <= case_num <= end):
             all_cases.append(key['@ixbug'])
     return all_cases
 
-def get_last_run(tempfile):
+def get_last_run():
     try:
-        with open(tempfile, 'r') as json_data:
+        with open(LOG_FILE, 'r') as json_data:
             data = json.load(json_data)
             return int(data['last_run'])
     except IOError:
         return 0
 
-def update_last_run(current_run, tempfile):
-    with open(tempfile, 'w') as state_file:
+def update_last_run(current_run):
+    with open(LOG_FILE, 'w') as state_file:
         data = {}
         data['last_run'] = current_run
         json.dump(data, state_file)
@@ -206,7 +225,7 @@ def upload_range(upload_list):
                 sys.exit(1)
 
 def main():
-    global fb, db_url, db_user, db_pass, fb_url, fb_user, fb_pass, rss_url
+    global fb
     current_run = calendar.timegm(time.gmtime())
     optparser = OptionParser()
     optparser.add_option(
@@ -233,21 +252,11 @@ def main():
         help='upload all cases in the specified range of '
                 'case IDs in addition to any new edits'
     )
-    (options, args) = optparser.parse_args()
-    config = ConfigParser.RawConfigParser()
-    config.read(options.config_file)
-    rss_url = config.get('FogBugz', 'rss_url')
-    fb_url = config.get('FogBugz', 'fb_url')
-    fb_user = config.get("FogBugz", 'fb_user')
-    fb_pass = config.get("FogBugz", 'fb_pass')
-    db_url = config.get("Cloudant", 'db_url')
-    db_user = config.get("Cloudant", 'db_user')
-    db_pass = config.get("Cloudant", 'db_pass')
-    tempfile = config.get("LastRun", 'tempfile')
-
-    fb = FogBugz(fb_url)
-    fb.logon(fb_user, fb_pass)
-    last_run = get_last_run(tempfile)
+    options, _ = optparser.parse_args()
+    config_parse(options.config_file)
+    fb = FogBugz(FB_URL)
+    fb.logon(FB_USER, FB_PASS)
+    last_run = get_last_run()
     uploads = []
     if (options.allcases):
         # -a
@@ -263,7 +272,7 @@ def main():
         uploads = parse_rss(last_run)
     upload_range(uploads)
     if not (options.allcases or options.rangeupload):
-        update_last_run(current_run, tempfile)
+        update_last_run(current_run)
     fb.logoff()
 
 if __name__ == '__main__':
