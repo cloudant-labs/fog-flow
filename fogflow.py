@@ -84,6 +84,7 @@ def prune_event(event):
         if key not in excludekeys
     ])
     e['timestamp'] = unix_time(e['timestamp'], FB_TIME_FORMAT)
+    e['is_email'] = e['is_email'] == 'true'
     return e
 
 def transform(key):
